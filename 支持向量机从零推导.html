@@ -1,0 +1,2272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>支持向量机 · 从零推导交互式学习</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235b9dff'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>S</text></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css'">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js'"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js'"></script>
+<style>
+:root{
+  --bg:#0f1117;--bg2:#161922;--bg3:#1e2230;--card:#1a1e2a;
+  --text:#e4e6ed;--text2:#9ba1b3;--text3:#6b7184;
+  --accent:#5b9dff;--accent2:#7c5bff;--accent3:#38d39f;
+  --warn:#ffb454;--danger:#ff6b6b;--border:#2a2f3f;
+  --code-bg:#0d0f16;--radius:10px;
+}
+[data-theme="light"]{
+  --bg:#f7f8fa;--bg2:#ffffff;--bg3:#eef0f4;--card:#ffffff;
+  --text:#1a1d29;--text2:#555a6e;--text3:#8a8fa3;
+  --accent:#2563eb;--accent2:#7c3aed;--accent3:#059669;
+  --warn:#d97706;--danger:#dc2626;--border:#e2e5ec;
+  --code-bg:#f0f2f6;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;overflow-x:hidden;max-width:100vw}
+body{font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.75;font-size:15.5px;
+  transition:background .3s,color .3s;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+/* ===== 布局 ===== */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:260px;max-width:82vw;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+  position:fixed;top:0;left:0;bottom:0;overflow-y:auto;overflow-x:hidden;padding:24px 0;z-index:100;
+  transition:transform .3s}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.main{flex:1;margin-left:260px;padding:40px 48px 80px;max-width:960px}
+/* ===== 侧边栏 ===== */
+.sidebar-title{padding:0 20px 20px;font-size:18px;font-weight:700;letter-spacing:.5px}
+.sidebar-title span{color:var(--accent)}
+.nav-item{display:block;padding:9px 20px;font-size:14px;color:var(--text2);cursor:pointer;
+  border-left:3px solid transparent;transition:all .2s}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:var(--bg3)}
+.nav-sub{padding-left:36px;font-size:13px}
+.nav-section{padding:16px 20px 6px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:600}
+/* ===== 顶部栏 ===== */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.breadcrumb{font-size:13px;color:var(--text3)}
+.breadcrumb .sep{margin:0 6px}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.btn{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);
+  color:var(--text);cursor:pointer;font-size:13px;transition:all .2s;font-family:inherit}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{opacity:.88;color:#fff}
+/* ===== 内容 ===== */
+h1{font-size:32px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
+h2{font-size:24px;font-weight:700;margin:48px 0 16px;padding-bottom:10px;border-bottom:2px solid var(--border);
+  display:flex;align-items:center;gap:10px}
+h2 .num{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:8px;font-size:16px}
+h3{font-size:19px;font-weight:600;margin:32px 0 12px;color:var(--text)}
+h4{font-size:16px;font-weight:600;margin:20px 0 8px;color:var(--accent)}
+p{margin-bottom:14px;color:var(--text)}
+.lead{font-size:17px;color:var(--text2);margin-bottom:24px;line-height:1.8}
+/* ===== 公式块 ===== */
+.formula{background:var(--code-bg);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 22px;margin:16px 0;overflow-x:auto;text-align:center}
+.formula-left{text-align:left}
+.formula-label{float:right;font-size:12px;color:var(--text3);margin-top:4px}
+/* ===== 推导步骤 ===== */
+.derive-steps{margin:20px 0}
+.derive-step{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;
+  background:var(--card)}
+.derive-step-header{padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;
+  background:var(--bg3);transition:background .2s;user-select:none}
+.derive-step-header:hover{background:var(--bg2)}
+.derive-step-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.derive-step-title{flex:1;font-weight:600;font-size:14.5px}
+.derive-step-arrow{color:var(--text3);transition:transform .3s;font-size:12px}
+.derive-step.open .derive-step-arrow{transform:rotate(90deg)}
+.derive-step-body{padding:0 18px;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .3s}
+.derive-step.open .derive-step-body{padding:16px 18px 20px;max-height:5000px}
+/* ===== 提示框 ===== */
+.callout{padding:14px 18px;border-radius:var(--radius);margin:16px 0;border-left:4px solid;font-size:14.5px}
+.callout-tip{background:rgba(91,157,255,.08);border-color:var(--accent)}
+.callout-warn{background:rgba(255,180,84,.08);border-color:var(--warn)}
+.callout-key{background:rgba(56,211,159,.08);border-color:var(--accent3)}
+.callout-danger{background:rgba(255,107,107,.08);border-color:var(--danger)}
+.callout-title{font-weight:700;margin-bottom:6px;font-size:14px}
+/* ===== 表格 ===== */
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--bg3);font-weight:600;color:var(--text2);font-size:13px}
+tr:hover td{background:var(--bg3)}
+/* ===== Canvas 演示 ===== */
+.demo-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin:20px 0}
+.demo-title{font-weight:700;font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.demo-title::before{content:"";width:4px;height:16px;background:var(--accent);border-radius:2px}
+.demo-desc{font-size:13px;color:var(--text2);margin-bottom:14px}
+.demo-canvas-wrap{position:relative;background:var(--bg);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.demo-canvas-wrap canvas{display:block;width:100%;height:auto}
+.demo-controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.demo-control{display:flex;align-items:center;gap:8px;font-size:13px}
+.demo-control label{color:var(--text2);white-space:nowrap}
+.demo-control input[type=range]{width:120px;accent-color:var(--accent)}
+.demo-control .val{color:var(--accent);font-weight:600;min-width:36px;font-variant-numeric:tabular-nums}
+.demo-stats{display:flex;gap:20px;margin-top:12px;font-size:13px;flex-wrap:wrap}
+.demo-stat{color:var(--text2)}
+.demo-stat b{color:var(--accent3);font-variant-numeric:tabular-nums}
+/* ===== 代码块 ===== */
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;overflow-x:auto;margin:14px 0;font-size:13px;line-height:1.6}
+code{font-family:"JetBrains Mono","Fira Code",Consolas,monospace;font-size:13.5px}
+:not(pre)>code{background:var(--bg3);padding:2px 6px;border-radius:4px;color:var(--accent)}
+/* ===== 知识卡片 ===== */
+.knowledge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:18px 0}
+@media(min-width:900px){.knowledge-grid{grid-template-columns:repeat(4,1fr)}}
+.knowledge-grid.cols-2{grid-template-columns:repeat(2,1fr)}
+@media(min-width:900px){.knowledge-grid.cols-2{grid-template-columns:repeat(2,1fr)}}
+.k-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;
+  transition:transform .2s,border-color .2s}
+.k-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.k-card-icon{font-size:22px;margin-bottom:8px}
+.k-card-title{font-weight:700;font-size:14.5px;margin-bottom:6px}
+.k-card-desc{font-size:13px;color:var(--text2);line-height:1.6}
+/* ===== 进度 ===== */
+.progress-bar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  z-index:200;transition:width .1s}
+/* ===== 页脚 ===== */
+.footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);color:var(--text3);font-size:13px;
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+/* ===== 移动端 ===== */
+.menu-toggle{display:none;position:fixed;top:14px;left:14px;z-index:150;width:40px;height:40px;
+  border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  cursor:pointer;align-items:center;justify-content:center;font-size:18px;line-height:1}
+.menu-toggle svg{width:20px;height:20px;fill:currentColor}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+@media(max-width:768px){
+  .menu-toggle{display:flex}
+  .sidebar{transform:translateX(-100%);display:none}
+  .sidebar.open{transform:translateX(0);display:block}
+  .overlay.show{display:block}
+  .main{margin-left:0;padding:60px 20px 60px}
+  h1{font-size:24px}
+  h2{font-size:20px}
+  .demo-controls{gap:10px}
+  table{font-size:12.5px}
+  th,td{padding:8px 10px}
+}
+/* ===== 打印 ===== */
+@media print{.sidebar,.topbar-actions,.menu-toggle,.progress-bar{display:none}.main{margin:0;max-width:100%}}
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progressBar" style="width:0%"></div>
+<button class="menu-toggle" id="menuToggle" aria-label="菜单"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+<div class="overlay" id="overlay"></div>
+
+<div class="layout">
+<!-- ===== 侧边栏 ===== -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-title">SVM <span>从零推导</span></div>
+  <div class="nav-section">入门</div>
+  <a class="nav-item active" data-target="intro">课程概览</a>
+  <a class="nav-item" data-target="intuition">核心直觉</a>
+  <div class="nav-section">硬间隔</div>
+  <a class="nav-item" data-target="hard-model">优化模型建立</a>
+  <a class="nav-item" data-target="hard-dual">对偶问题推导</a>
+  <a class="nav-item" data-target="hard-kkt">KKT与参数恢复</a>
+  <a class="nav-item" data-target="hard-example">手算示例</a>
+  <div class="nav-section">软间隔</div>
+  <a class="nav-item" data-target="soft-intro">松弛变量与hinge损失</a>
+  <a class="nav-item" data-target="soft-dual">软间隔对偶</a>
+  <div class="nav-section">核方法</div>
+  <a class="nav-item" data-target="kernel-idea">特征映射与核技巧</a>
+  <a class="nav-item" data-target="kernel-types">核函数详解</a>
+  <a class="nav-item" data-target="kernel-predict">核SVM预测</a>
+  <div class="nav-section">实验</div>
+  <a class="nav-item" data-target="exp-code">代码与调参</a>
+  <a class="nav-item" data-target="exp-cv">交叉验证</a>
+  <div class="nav-section">总结</div>
+  <a class="nav-item" data-target="summary">知识图谱</a>
+</nav>
+
+<!-- ===== 主内容 ===== -->
+<main class="main" id="mainContent">
+<div class="topbar">
+  <div class="breadcrumb">支持向量机 <span class="sep">/</span> <span id="crumbCurrent">课程概览</span></div>
+  <div class="topbar-actions">
+    <button class="btn" id="themeToggle"><span id="themeIcon">◐</span> <span id="themeText">深色</span></button>
+    <button class="btn" id="expandAll">展开全部推导</button>
+  </div>
+</div>
+
+<!-- ============ 章节：课程概览 ============ -->
+<section id="intro" class="chapter">
+  <h1>支持向量机 · 从零推导</h1>
+  <p class="lead">本页面基于杭州电子科技大学王春雪老师《机器学习》课程课件，将支持向量机（SVM）的全部核心原理从第一性原理出发完整推导。每一步推导均可展开查看，关键概念配有交互式可视化演示。</p>
+
+  <div class="knowledge-grid">
+    <div class="k-card">
+      <div class="k-card-icon" style="color:var(--accent3)">●</div>
+      <div class="k-card-title">最大间隔</div>
+      <div class="k-card-desc">在所有能正确分类的超平面中，选择使最近样本距离最大的那一个——这是SVM的核心思想。</div>
+    </div>
+    <div class="k-card">
+      <div class="k-card-icon" style="color:var(--accent)">●</div>
+      <div class="k-card-title">凸二次规划</div>
+      <div class="k-card-desc">SVM的原问题是凸二次规划，通过拉格朗日对偶转化为只含样本内积的对偶问题。</div>
+    </div>
+    <div class="k-card">
+      <div class="k-card-icon" style="color:var(--accent2)">●</div>
+      <div class="k-card-title">核技巧</div>
+      <div class="k-card-desc">对偶问题中数据只通过内积参与，用核函数替代内积即可在高维空间学习线性分类器。</div>
+    </div>
+    <div class="k-card">
+      <div class="k-card-icon" style="color:var(--warn)">●</div>
+      <div class="k-card-title">软间隔</div>
+      <div class="k-card-desc">引入松弛变量容忍噪声和重叠，参数C平衡间隔宽度与分类错误。</div>
+    </div>
+  </div>
+
+  <h3>学习路径</h3>
+  <p>建议按以下顺序学习，每一章都建立在前一章的基础上：</p>
+  <table>
+    <colgroup><col style="width:8%"><col style="width:22%"><col style="width:45%"><col style="width:25%"></colgroup>
+    <thead><tr><th>阶段</th><th>主题</th><th>核心问题</th><th>关键产出</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>核心直觉</td><td>为什么要最大化间隔？支持向量是什么？</td><td>几何间隔、分类间隔</td></tr>
+      <tr><td>2</td><td>硬间隔SVM</td><td>如何将最大间隔转化为优化问题？如何求解？</td><td>原问题、对偶问题、KKT</td></tr>
+      <tr><td>3</td><td>软间隔SVM</td><td>数据不完全可分时怎么办？</td><td>松弛变量、hinge损失、C参数</td></tr>
+      <tr><td>4</td><td>核方法</td><td>线性不可分的数据如何处理？</td><td>特征映射、核函数、RBF核</td></tr>
+      <tr><td>5</td><td>实验调参</td><td>如何在实际数据上训练和调优？</td><td>sklearn代码、交叉验证</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">使用说明</div>
+    每个推导步骤默认折叠，点击标题展开。页面顶部的"展开全部推导"按钮可一次性展开所有推导。可视化演示中的滑块可实时调节参数，观察决策边界变化。
+  </div>
+</section>
+
+<!-- ============ 章节：核心直觉 ============ -->
+<section id="intuition" class="chapter" style="display:none">
+  <h2><span class="num">1</span>核心直觉：为什么要最大间隔</h2>
+
+  <h3>1.1 问题设定</h3>
+  <p>给定训练集 $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^n$，其中：</p>
+  <div class="formula formula-left">
+  $$\mathbf{x}_i \in \mathbb{R}^d,\quad y_i \in \{-1, +1\}$$
+  </div>
+  <p>$n$ 是样本数，$d$ 是特征维数。我们的目标是学习一个决策函数 $f(\mathbf{x})$，使得对新样本能正确预测其类别。</p>
+
+  <h3>1.2 线性分类器与超平面</h3>
+  <p>线性分类器的决策函数为：</p>
+  <div class="formula">
+  $$f(\mathbf{x}) = \mathbf{w}^T \mathbf{x} + b = \sum_{k=1}^d w_k x_k + b$$
+  </div>
+  <p>预测规则：</p>
+  <div class="formula">
+  $$\hat{y} = \begin{cases} +1, & f(\mathbf{x}) \ge 0 \\ -1, & f(\mathbf{x}) < 0 \end{cases}$$
+  </div>
+  <p>分类边界（超平面）为 $H = \{\mathbf{x}: f(\mathbf{x}) = 0\}$。$\mathbf{w}$ 是法向量（与边界垂直），$b$ 控制边界位置。本课约定 $\text{sign}(0) = +1$，即边界上的点归入正类。</p>
+
+  <div class="callout callout-key">
+    <div class="callout-title">关键几何事实</div>
+    原点到超平面 $H$ 的距离为 $d(\mathbf{0}, H) = \frac{|b|}{\|\mathbf{w}\|_2}$。$\mathbf{w}$ 的缩放不改变边界，但改变距离的计算值——这一点在后续规范化中至关重要。
+  </div>
+
+  <h3>1.3 同样分对，间隔不同</h3>
+  <p>考虑二维空间中的两个分类边界：</p>
+  <ul style="margin:0 0 14px 24px">
+    <li>边界A：$x_1 + x_2 - 7.8 = 0$，最近样本距离 $\rho_A = \frac{0.2}{\sqrt{2}} \approx 0.141$</li>
+    <li>边界B：$x_1 + x_2 - 7 = 0$，最近样本距离 $\rho_B = \frac{1}{\sqrt{2}} \approx 0.707$</li>
+  </ul>
+  <p>两条边界都能正确分类所有训练样本，但边界B的间隔是边界A的5倍。<strong>间隔越大，对噪声的鲁棒性越强</strong>——微小的扰动不太可能使样本跨越边界。</p>
+
+  <h3>1.4 交互式演示：最大间隔</h3>
+  <div class="demo-card">
+    <div class="demo-title">演示：调节超平面，观察间隔变化</div>
+    <div class="demo-desc">拖动滑块改变边界的斜率和截距，红色为负类、绿色为正类。观察最近样本到边界的距离（间隔）如何变化。目标是找到使间隔最大的边界。</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="marginCanvas" width="600" height="400"></canvas>
+    </div>
+    <div class="demo-controls">
+      <div class="demo-control">
+        <label>斜率 w₁</label>
+        <input type="range" id="m_slope" min="-3" max="3" step="0.1" value="1">
+        <span class="val" id="m_slope_val">1.0</span>
+      </div>
+      <div class="demo-control">
+        <label>截距 b</label>
+        <input type="range" id="m_bias" min="-6" max="6" step="0.1" value="0">
+        <span class="val" id="m_bias_val">0.0</span>
+      </div>
+      <button class="btn btn-primary" id="m_optimal">最优边界</button>
+    </div>
+    <div class="demo-stats">
+      <div class="demo-stat">最近距离 ρ = <b id="m_rho">—</b></div>
+      <div class="demo-stat">分类间隔 M = <b id="m_margin">—</b></div>
+      <div class="demo-stat">状态 = <b id="m_status">—</b></div>
+    </div>
+  </div>
+
+  <h3>1.5 核心概念定义</h3>
+  <table>
+    <colgroup><col style="width:22%"><col style="width:78%"></colgroup>
+    <thead><tr><th>概念</th><th>定义</th></tr></thead>
+    <tbody>
+      <tr><td><strong>分类间隔 (Margin)</strong></td><td>两条支撑线 $H_1: \mathbf{w}^T\mathbf{x}+b=+1$ 和 $H_2: \mathbf{w}^T\mathbf{x}+b=-1$ 之间的垂直距离，$M = \frac{2}{\|\mathbf{w}\|_2}$</td></tr>
+      <tr><td><strong>最佳超平面</strong></td><td>使分类间隔 $M$ 最大的超平面，即"最宽最居中"的隔离带中心线</td></tr>
+      <tr><td><strong>支持向量 (Support Vector)</strong></td><td>距离最佳超平面最近的样本点，恰好在支撑线上，决定了边界的位置和方向</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">思考</div>
+    为什么支持向量"决定了边界"？因为在最佳超平面下，非支持向量的样本都在间隔之外，移动它们（只要不进入间隔）不会改变边界。这意味着SVM的解具有稀疏性——只有少数样本参与最终预测。
+  </div>
+</section>
+
+<!-- ============ 章节：硬间隔 - 优化模型建立 ============ -->
+<section id="hard-model" class="chapter" style="display:none">
+  <h2><span class="num">2</span>硬间隔SVM：优化模型建立</h2>
+
+  <h3>2.1 几何间隔的严格定义</h3>
+  <p>样本点 $\mathbf{x}_i$ 到超平面 $H: \mathbf{w}^T\mathbf{x} + b = 0$ 的几何距离为：</p>
+  <div class="formula">
+  $$d(\mathbf{w}, b, \mathbf{x}_i) = \frac{|\mathbf{w}^T \mathbf{x}_i + b|}{\|\mathbf{w}\|_2}$$
+  </div>
+  <p>当分类正确时，$y_i(\mathbf{w}^T\mathbf{x}_i + b) > 0$，因此带符号的几何距离为：</p>
+  <div class="formula">
+  $$\frac{y_i(\mathbf{w}^T \mathbf{x}_i + b)}{\|\mathbf{w}\|_2} > 0$$
+  </div>
+  <p>定义<strong>最小几何间隔</strong>（所有样本中到超平面的最近距离）：</p>
+  <div class="formula">
+  $$\rho(\mathbf{w}, b) = \min_{1 \le i \le n} \frac{y_i(\mathbf{w}^T \mathbf{x}_i + b)}{\|\mathbf{w}\|_2}$$
+  </div>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么距离公式是 |wᵀx+b| / ‖w‖₂？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>从二维平面点到直线的距离推广。直线 $Ax + By + C = 0$，点 $(x_0, y_0)$ 到直线的距离为：</p>
+        <div class="formula">$d = \frac{|Ax_0 + By_0 + C|}{\sqrt{A^2 + B^2}}$</div>
+        <p>高维超平面 $\mathbf{w}^T\mathbf{x} + b = 0$ 中，$\mathbf{w} = (w_1, \dots, w_d)$ 相当于 $(A, B)$，$b$ 相当于 $C$，$\|\mathbf{w}\|_2 = \sqrt{\sum w_k^2}$ 相当于 $\sqrt{A^2+B^2}$。因此：</p>
+        <div class="formula">$d = \frac{|\mathbf{w}^T\mathbf{x} + b|}{\|\mathbf{w}\|_2}$</div>
+        <p>严格证明：设 $\mathbf{x}_0$ 在超平面上（$\mathbf{w}^T\mathbf{x}_0 + b = 0$），则 $\mathbf{x} - \mathbf{x}_0$ 在超平面法向 $\mathbf{w}$ 上的投影长度即为距离：</p>
+        <div class="formula">$d = \frac{|\mathbf{w}^T(\mathbf{x} - \mathbf{x}_0)|}{\|\mathbf{w}\|_2} = \frac{|\mathbf{w}^T\mathbf{x} - \mathbf{w}^T\mathbf{x}_0|}{\|\mathbf{w}\|_2} = \frac{|\mathbf{w}^T\mathbf{x} + b|}{\|\mathbf{w}\|_2}$</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.2 原始优化目标</h3>
+  <p>SVM的目标是：在保证所有样本分类正确的前提下，最大化最小几何间隔 $\rho(\mathbf{w}, b)$。</p>
+  <div class="formula">
+  $$\max_{\mathbf{w} \neq \mathbf{0},\, b \in \mathbb{R}} \rho(\mathbf{w}, b) = \max_{\mathbf{w}, b} \min_{1 \le i \le n} \frac{y_i(\mathbf{w}^T \mathbf{x}_i + b)}{\|\mathbf{w}\|_2}$$
+  $$\text{s.t.} \quad y_i(\mathbf{w}^T \mathbf{x}_i + b) > 0,\quad i = 1, \dots, n$$
+  </div>
+  <p>这个形式有一个问题：$\mathbf{w}$ 和 $b$ 同时乘以任意正数 $c > 0$，超平面不变，但 $\rho$ 也不变（分子分母同比例缩放）。这意味着解不唯一，优化存在冗余自由度。</p>
+
+  <h3>2.3 参数规范化（关键技巧）</h3>
+  <p>利用上述缩放自由度，我们<strong>固定</strong>最近样本的函数间隔为1：</p>
+  <div class="formula">
+  $$\min_{1 \le i \le n} y_i(\mathbf{w}^T \mathbf{x}_i + b) = 1$$
+  </div>
+  <p>这等价于约束：</p>
+  <div class="formula">
+  $$y_i(\mathbf{w}^T \mathbf{x}_i + b) \ge 1,\quad i = 1, \dots, n$$
+  </div>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么可以这样规范化？不会丢失解吗？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>设任意一组 $(\mathbf{w}, b)$ 使所有样本分类正确，令 $m = \min_i y_i(\mathbf{w}^T\mathbf{x}_i + b) > 0$。</p>
+        <p>定义新参数 $\mathbf{w}' = \mathbf{w}/m$，$b' = b/m$。则：</p>
+        <div class="formula">$y_i(\mathbf{w}'^T\mathbf{x}_i + b') = \frac{1}{m} y_i(\mathbf{w}^T\mathbf{x}_i + b) \ge 1$</div>
+        <p>且 $\min_i y_i(\mathbf{w}'^T\mathbf{x}_i + b') = 1$。</p>
+        <p>同时，超平面 $\mathbf{w}'^T\mathbf{x} + b' = 0$ 与原超平面 $\mathbf{w}^T\mathbf{x} + b = 0$ 完全相同（两边同乘 $m$）。</p>
+        <p><strong>结论</strong>：任何可行解都可以通过缩放规范化为满足 $\min y_i f(\mathbf{x}_i) = 1$ 的形式，且不改变超平面。因此规范化不丢失任何解，只是消除了冗余的缩放自由度。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.4 分类间隔与最终目标</h3>
+  <p>规范化后，两条支撑线为：</p>
+  <div class="formula">
+  $$H_+: \mathbf{w}^T\mathbf{x} + b = +1,\quad H_-: \mathbf{w}^T\mathbf{x} + b = -1$$
+  </div>
+  <p>分类间隔（两条支撑线之间的垂直距离）为：</p>
+  <div class="formula">
+  $$M = d(H_+, H_-) = \frac{|1 - (-1)|}{\|\mathbf{w}\|_2} = \frac{2}{\|\mathbf{w}\|_2}$$
+  </div>
+  <p>最大化间隔 $M = \frac{2}{\|\mathbf{w}\|_2}$ 等价于最小化 $\|\mathbf{w}\|_2$。为了使目标函数可导且为凸二次型，写成 $\frac{1}{2}\|\mathbf{w}\|_2^2$（系数 $\frac{1}{2}$ 是为了求导后消去2，不影响最优解）。</p>
+
+  <div class="callout callout-key">
+    <div class="callout-title">硬间隔SVM原问题（Primal Problem）</div>
+    <div class="formula" style="margin:10px 0">
+    $$\min_{\mathbf{w} \in \mathbb{R}^d,\, b \in \mathbb{R}} \frac{1}{2}\|\mathbf{w}\|_2^2$$
+    $$\text{s.t.} \quad y_i(\mathbf{w}^T \mathbf{x}_i + b) \ge 1,\quad i = 1, 2, \dots, n$$
+    </div>
+  </div>
+
+  <h3>2.5 为什么这是凸二次规划？</h3>
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">凸性证明：目标函数凸 + 约束凸 = 凸优化问题</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p><strong>目标函数凸性</strong>：$f(\mathbf{w}) = \frac{1}{2}\|\mathbf{w}\|_2^2 = \frac{1}{2}\mathbf{w}^T\mathbf{w}$，其Hessian矩阵为 $\nabla^2 f = \mathbf{I}$（单位矩阵），特征值全为1 > 0，因此是严格凸函数。</p>
+        <p><strong>约束凸性</strong>：每个约束 $g_i(\mathbf{w}, b) = 1 - y_i(\mathbf{w}^T\mathbf{x}_i + b) \le 0$ 是关于 $(\mathbf{w}, b)$ 的仿射函数（线性函数+常数），仿射函数既是凸的也是凹的。$\{(\mathbf{w},b): g_i \le 0\}$ 是半空间，为凸集。</p>
+        <p><strong>可行域凸性</strong>：$n$ 个半空间的交集仍是凸集。</p>
+        <p><strong>结论</strong>：在凸集上最小化凸函数 = 凸优化问题。凸优化的局部最优即全局最优，且有成熟的求解算法（如SMO、内点法）。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">适用条件</div>
+    硬间隔SVM要求数据<strong>严格线性可分</strong>——存在一个超平面能将两类样本完全分开且间隔非零。如果数据线性不可分，原问题的可行域为空，优化无解。这正是后续软间隔SVM要解决的问题。
+  </div>
+</section>
+
+<!-- ============ 章节：硬间隔 - 对偶问题推导 ============ -->
+<section id="hard-dual" class="chapter" style="display:none">
+  <h2><span class="num">3</span>硬间隔SVM：对偶问题完整推导</h2>
+  <p class="lead">原问题含有 $d+1$ 个变量（$\mathbf{w}$ 的 $d$ 个分量 + $b$）和 $n$ 个不等式约束。当 $d$ 很大时直接求解困难。通过拉格朗日对偶，我们将问题转化为只含 $n$ 个变量 $\alpha_i$ 的对偶问题，且数据只通过样本内积参与——这是核方法的入口。</p>
+
+  <h3>3.1 推导路线总览</h3>
+  <div class="knowledge-grid">
+    <div class="k-card"><div class="k-card-icon" style="color:var(--accent)">1</div><div class="k-card-title">构造拉格朗日函数</div><div class="k-card-desc">引入乘子 αᵢ ≥ 0，将约束融入目标</div></div>
+    <div class="k-card"><div class="k-card-icon" style="color:var(--accent)">2</div><div class="k-card-title">对 w 求极小</div><div class="k-card-desc">得到 w = Σαᵢyᵢxᵢ</div></div>
+    <div class="k-card"><div class="k-card-icon" style="color:var(--accent)">3</div><div class="k-card-title">对 b 求极小</div><div class="k-card-desc">得到约束 Σαᵢyᵢ = 0</div></div>
+    <div class="k-card"><div class="k-card-icon" style="color:var(--accent)">4</div><div class="k-card-title">代回合并</div><div class="k-card-desc">得到只含 α 的对偶函数</div></div>
+    <div class="k-card"><div class="k-card-icon" style="color:var(--accent)">5</div><div class="k-card-title">展开内积</div><div class="k-card-desc">数据通过 xᵢᵀxⱼ 参与计算</div></div>
+    <div class="k-card"><div class="k-card-icon" style="color:var(--accent)">6</div><div class="k-card-title">对偶问题</div><div class="k-card-desc">max 对偶函数，s.t. α≥0, Σαᵢyᵢ=0</div></div>
+  </div>
+
+  <h3>3.2 步骤1：构造拉格朗日函数</h3>
+  <p>将原约束改写为 $g_i(\mathbf{w}, b) = 1 - y_i(\mathbf{w}^T\mathbf{x}_i + b) \le 0$ 的形式（注意方向：原约束 $y_i f(\mathbf{x}_i) \ge 1$ 移项得 $1 - y_i f(\mathbf{x}_i) \le 0$）。</p>
+  <p>对每个不等式约束引入非负拉格朗日乘子 $\alpha_i \ge 0$，构造拉格朗日函数：</p>
+  <div class="formula">
+  $$L(\mathbf{w}, b, \boldsymbol{\alpha}) = \frac{1}{2}\|\mathbf{w}\|_2^2 + \sum_{i=1}^n \alpha_i \left[1 - y_i(\mathbf{w}^T \mathbf{x}_i + b)\right]$$
+  </div>
+  <p>其中 $\boldsymbol{\alpha} = (\alpha_1, \dots, \alpha_n)^T$，$\alpha_i \ge 0$。</p>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么约束写成 gᵢ ≤ 0，乘子 αᵢ ≥ 0？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>拉格朗日对偶的标准形式要求约束为 $g_i(\mathbf{x}) \le 0$，对应乘子 $\alpha_i \ge 0$。这是为了保证对偶函数给出原问题最优值的下界。</p>
+        <p>直觉：当约束被违反时（$g_i > 0$），$\alpha_i g_i > 0$ 会增大 $L$，而我们要最小化 $L$，这就"惩罚"了违反约束的情况。当约束满足时（$g_i \le 0$），$\alpha_i g_i \le 0$ 会减小 $L$。</p>
+        <p>如果约束写成 $g_i \ge 0$，则乘子应取 $\alpha_i \le 0$。本课统一使用 $g_i \le 0,\ \alpha_i \ge 0$ 的约定。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>3.3 步骤2：对偶函数与弱对偶</h3>
+  <p>定义对偶函数为拉格朗日函数对原始变量 $(\mathbf{w}, b)$ 取下确界：</p>
+  <div class="formula">
+  $$g(\boldsymbol{\alpha}) = \inf_{\mathbf{w} \in \mathbb{R}^d,\, b \in \mathbb{R}} L(\mathbf{w}, b, \boldsymbol{\alpha}),\quad \boldsymbol{\alpha} \ge \mathbf{0}$$
+  </div>
+  <p>对任意原始可行点 $(\mathbf{w}, b)$（满足所有约束），有 $g_i(\mathbf{w}, b) \le 0$，因此 $\sum \alpha_i g_i \le 0$，从而：</p>
+  <div class="formula">
+  $$g(\boldsymbol{\alpha}) \le L(\mathbf{w}, b, \boldsymbol{\alpha}) \le \frac{1}{2}\|\mathbf{w}\|_2^2$$
+  </div>
+  <p>对所有可行点取最小，得 $g(\boldsymbol{\alpha}) \le p^*$（原问题最优值）。这就是<strong>弱对偶性</strong>：对偶问题的最优值 $d^* \le p^*$。</p>
+
+  <h3>3.4 步骤3：对 w 求极小</h3>
+  <p>将 $L$ 展开并整理关于 $\mathbf{w}$ 的项。令：</p>
+  <div class="formula">
+  $$\mathbf{q}(\boldsymbol{\alpha}) = \sum_{i=1}^n \alpha_i y_i \mathbf{x}_i$$
+  </div>
+  <p>则拉格朗日函数可写为：</p>
+  <div class="formula">
+  $$L = \frac{1}{2}\mathbf{w}^T\mathbf{w} - \mathbf{w}^T\mathbf{q} + \sum_{i=1}^n \alpha_i - b\sum_{i=1}^n \alpha_i y_i$$
+  </div>
+  <p>对 $\mathbf{w}$ 求梯度并令其为零：</p>
+  <div class="formula">
+  $$\nabla_{\mathbf{w}} L = \mathbf{w} - \mathbf{q} = \mathbf{0} \implies \mathbf{w}^* = \mathbf{q} = \sum_{i=1}^n \alpha_i y_i \mathbf{x}_i$$
+  </div>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么驻点就是全局极小？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>$L$ 关于 $\mathbf{w}$ 的部分为 $\frac{1}{2}\mathbf{w}^T\mathbf{w} - \mathbf{w}^T\mathbf{q} + \text{常数}$。</p>
+        <p>这是关于 $\mathbf{w}$ 的二次函数，其Hessian矩阵为 $\nabla_{\mathbf{w}}^2 L = \mathbf{I}$（单位矩阵），正定。</p>
+        <p>正定二次函数的驻点（梯度为零的点）是唯一的全局极小点。因此 $\mathbf{w} = \mathbf{q}$ 确实使 $L$ 关于 $\mathbf{w}$ 取得全局最小值。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>3.5 步骤4：对 b 求极小</h3>
+  <p>$L$ 中含 $b$ 的项为 $-b \sum_{i=1}^n \alpha_i y_i$。令 $c(\boldsymbol{\alpha}) = \sum_{i=1}^n \alpha_i y_i$，则该项为 $-bc$。</p>
+  <p>对 $b \in \mathbb{R}$ 求下确界：</p>
+  <div class="formula">
+  $$\inf_{b \in \mathbb{R}} (-bc) = \begin{cases} 0, & c = 0 \\ -\infty, & c \neq 0 \end{cases}$$
+  </div>
+  <p>当 $c \neq 0$ 时，对偶函数取值 $-\infty$，没有意义（不能提供有用的下界）。因此必须施加约束：</p>
+  <div class="formula">
+  $$\sum_{i=1}^n \alpha_i y_i = 0$$
+  </div>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">直观理解：为什么 Σαᵢyᵢ = 0？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>$\mathbf{w}^* = \sum \alpha_i y_i \mathbf{x}_i$ 是支持向量的加权组合。$\sum \alpha_i y_i = 0$ 意味着正类样本的总权重等于负类样本的总权重（绝对值）。</p>
+        <p>如果 $\sum \alpha_i y_i \neq 0$，那么改变 $b$ 可以让 $L$ 趋向 $-\infty$——这意味着我们可以通过无限移动边界来降低目标，但这在物理上是不合理的（边界平移不应改变间隔宽度）。约束 $\sum \alpha_i y_i = 0$ 排除了这种退化情况。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>3.6 步骤5：代回并合并二次项</h3>
+  <p>将 $\mathbf{w} = \mathbf{q}$ 和 $\sum \alpha_i y_i = 0$ 代回 $L$：</p>
+  <div class="formula">
+  $$L(\mathbf{q}, b, \boldsymbol{\alpha}) = \frac{1}{2}\mathbf{q}^T\mathbf{q} - \mathbf{q}^T\mathbf{q} + \sum_{i=1}^n \alpha_i - b \cdot 0$$
+  $$= -\frac{1}{2}\mathbf{q}^T\mathbf{q} + \sum_{i=1}^n \alpha_i$$
+  </div>
+  <p>因此对偶函数为：</p>
+  <div class="formula">
+  $$g(\boldsymbol{\alpha}) = \sum_{i=1}^n \alpha_i - \frac{1}{2}\mathbf{q}^T\mathbf{q} = \sum_{i=1}^n \alpha_i - \frac{1}{2}\left\|\sum_{i=1}^n \alpha_i y_i \mathbf{x}_i\right\|_2^2$$
+  </div>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">二次项系数的来源</div>
+    原式 $\frac{1}{2}\mathbf{w}^T\mathbf{w}$ 代入 $\mathbf{w}=\mathbf{q}$ 得 $\frac{1}{2}\mathbf{q}^T\mathbf{q}$，交叉项 $-\mathbf{w}^T\mathbf{q}$ 代入得 $-\mathbf{q}^T\mathbf{q}$。合并：$\frac{1}{2} - 1 = -\frac{1}{2}$。
+  </div>
+
+  <h3>3.7 步骤6：展开平方，得到样本内积</h3>
+  <p>展开 $\mathbf{q}^T\mathbf{q}$：</p>
+  <div class="formula">
+  $$\mathbf{q}^T\mathbf{q} = \left(\sum_{i=1}^n \alpha_i y_i \mathbf{x}_i\right)^T \left(\sum_{j=1}^n \alpha_j y_j \mathbf{x}_j\right)$$
+  $$= \sum_{i=1}^n \sum_{j=1}^n \alpha_i \alpha_j y_i y_j \mathbf{x}_i^T \mathbf{x}_j$$
+  </div>
+  <p>这是一个双重求和，遍历所有样本对 $(i, j)$ 的内积。当 $n=2$ 时共有4项（包括 $i=j$ 的对角项和 $i \neq j$ 的非对角项）。</p>
+
+  <div class="callout callout-key">
+    <div class="callout-title">核方法的入口</div>
+    对偶目标中，数据只通过<strong>样本两两内积</strong> $\mathbf{x}_i^T \mathbf{x}_j$ 参与计算。这意味着如果我们用一个核函数 $K(\mathbf{x}_i, \mathbf{x}_j)$ 替代内积，就相当于在某个高维特征空间中学习线性分类器——而不需要显式计算高维映射。这就是核技巧（Kernel Trick）。
+  </div>
+
+  <h3>3.8 步骤7：对偶问题</h3>
+  <p>最大化对偶函数 $g(\boldsymbol{\alpha})$，得到对偶问题：</p>
+  <div class="formula">
+  $$\max_{\boldsymbol{\alpha} \in \mathbb{R}^n} \sum_{i=1}^n \alpha_i - \frac{1}{2}\sum_{i=1}^n \sum_{j=1}^n \alpha_i \alpha_j y_i y_j \mathbf{x}_i^T \mathbf{x}_j$$
+  $$\text{s.t.} \quad \alpha_i \ge 0,\ i = 1, \dots, n; \qquad \sum_{i=1}^n \alpha_i y_i = 0$$
+  </div>
+
+  <h3>3.9 强对偶性：为什么 p* = d*？</h3>
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">Slater条件与强对偶证明</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p><strong>Slater条件</strong>：对于凸优化问题，如果存在一个严格可行点（所有不等式约束严格成立），则强对偶成立（$p^* = d^*$）。</p>
+        <p>对于硬间隔SVM，数据严格线性可分意味着存在 $(\mathbf{w}_0, b_0)$ 使得 $y_i(\mathbf{w}_0^T\mathbf{x}_i + b_0) > 0$ 对所有 $i$ 成立。</p>
+        <p>将 $(\mathbf{w}_0, b_0)$ 缩放为 $(\mathbf{w}_0/m, b_0/m)$，其中 $m = \min_i y_i(\mathbf{w}_0^T\mathbf{x}_i + b_0) > 0$，则 $y_i(\mathbf{w}_0^T\mathbf{x}_i/m + b_0/m) \ge 1$。</p>
+        <p>再稍微放大参数（如乘以 $1+\epsilon$），可使所有约束严格成立：$y_i f(\mathbf{x}_i) > 1$。因此严格可行点存在，Slater条件满足，强对偶成立。</p>
+        <p><strong>结论</strong>：$p^* = d^*$，求解对偶问题等价于求解原问题。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">对偶问题的变量数</div>
+    对偶问题有 $n$ 个变量 $\alpha_i$，而原问题有 $d+1$ 个变量。当特征维数 $d$ 很大（如文本分类中 $d$ 可达数万）时，求解对偶问题（$n$ 个变量）可能比原问题更高效。反之，当样本数 $n$ 很大时，原问题可能更优——这也是线性SVM常用LIBLINEAR（原问题求解）的原因。
+  </div>
+</section>
+
+<!-- ============ 章节：硬间隔 - KKT与参数恢复 ============ -->
+<section id="hard-kkt" class="chapter" style="display:none">
+  <h2><span class="num">4</span>KKT条件与参数恢复</h2>
+  <p class="lead">求出对偶变量 $\boldsymbol{\alpha}^*$ 后，如何恢复原始变量 $\mathbf{w}^*$ 和 $b^*$？KKT条件告诉我们最优解必须满足的一组充要条件，其中互补松弛条件是理解支持向量的关键。</p>
+
+  <h3>4.1 KKT条件完整列出</h3>
+  <p>对于凸优化问题，强对偶成立时，$(\mathbf{w}^*, b^*, \boldsymbol{\alpha}^*)$ 是原问题和对偶问题的最优解，当且仅当满足以下KKT条件：</p>
+
+  <div class="derive-steps">
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num">1</span>
+        <span class="derive-step-title">原始可行性 (Primal Feasibility)</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula">$y_i(\mathbf{w}^{*T}\mathbf{x}_i + b^*) \ge 1,\quad i = 1, \dots, n$</div>
+        <p>所有样本都被正确分类且函数间隔至少为1。</p>
+      </div>
+    </div>
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num">2</span>
+        <span class="derive-step-title">对偶可行性 (Dual Feasibility)</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula">$\alpha_i^* \ge 0,\quad i = 1, \dots, n$</div>
+        <p>拉格朗日乘子非负。</p>
+      </div>
+    </div>
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num">3</span>
+        <span class="derive-step-title">互补松弛 (Complementary Slackness)</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula">$\alpha_i^* \cdot \left[y_i(\mathbf{w}^{*T}\mathbf{x}_i + b^*) - 1\right] = 0,\quad i = 1, \dots, n$</div>
+        <p>这是最关键的条件：对于每个样本，要么 $\alpha_i^* = 0$，要么 $y_i f(\mathbf{x}_i) = 1$（恰在支撑线上）。</p>
+      </div>
+    </div>
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num">4</span>
+        <span class="derive-step-title">梯度为零 (Stationarity)</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula">$\nabla_{\mathbf{w}} L = \mathbf{w}^* - \sum_{i=1}^n \alpha_i^* y_i \mathbf{x}_i = \mathbf{0}$</div>
+        <div class="formula">$\frac{\partial L}{\partial b} = -\sum_{i=1}^n \alpha_i^* y_i = 0$</div>
+        <p>拉格朗日函数在最优点处关于原始变量的梯度为零。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>4.2 互补松弛的深刻含义</h3>
+  <p>互补松弛条件 $\alpha_i^* [y_i f(\mathbf{x}_i) - 1] = 0$ 意味着每个样本属于以下两类之一：</p>
+
+  <table>
+    <colgroup><col style="width:25%"><col style="width:35%"><col style="width:40%"></colgroup>
+    <thead><tr><th>条件</th><th>样本位置</th><th>对边界的影响</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>$\alpha_i^* > 0$</td>
+        <td>$y_i f(\mathbf{x}_i) = 1$，在支撑线上</td>
+        <td><strong>支持向量</strong>：决定边界的位置和方向</td>
+      </tr>
+      <tr>
+        <td>$\alpha_i^* = 0$</td>
+        <td>$y_i f(\mathbf{x}_i) > 1$，在间隔之外</td>
+        <td>非支持向量：不影响边界，移动它（只要不进入间隔）不改变解</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-key">
+    <div class="callout-title">稀疏性</div>
+    SVM的解具有<strong>稀疏性</strong>：大多数样本的 $\alpha_i^* = 0$，只有少数支持向量的 $\alpha_i^* > 0$。预测时只需要计算支持向量与新样本的内积，大大降低了计算量。
+  </div>
+
+  <h3>4.3 恢复 w*</h3>
+  <p>由 stationarity 条件直接得到：</p>
+  <div class="formula">
+  $$\mathbf{w}^* = \sum_{i=1}^n \alpha_i^* y_i \mathbf{x}_i = \sum_{i \in SV} \alpha_i^* y_i \mathbf{x}_i$$
+  </div>
+  <p>其中 $SV = \{i: \alpha_i^* > 0\}$ 是支持向量集合。由于非支持向量的 $\alpha_i^* = 0$，求和只需遍历支持向量。</p>
+
+  <h3>4.4 恢复 b*</h3>
+  <p>对于任意支持向量 $j \in SV$（即 $\alpha_j^* > 0$），由互补松弛知 $y_j(\mathbf{w}^{*T}\mathbf{x}_j + b^*) = 1$，解得：</p>
+  <div class="formula">
+  $$b^* = y_j - \mathbf{w}^{*T}\mathbf{x}_j,\quad j \in SV$$
+  </div>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么可以用任意支持向量计算 b*？结果应该一样吗？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>理论上，所有支持向量都满足 $y_j f(\mathbf{x}_j) = 1$，因此用任意支持向量计算的 $b^*$ 应该相同。</p>
+        <p>但在数值计算中，由于浮点误差，不同支持向量算出的 $b^*$ 可能有微小差异。实践中通常取所有支持向量计算结果的平均值以提高数值稳定性：</p>
+        <div class="formula">$b^* = \frac{1}{|SV|} \sum_{j \in SV} (y_j - \mathbf{w}^{*T}\mathbf{x}_j)$</div>
+        <p>在软间隔SVM中，只有"自由支持向量"（$0 < \alpha_i < C$）才满足 $y_i f(\mathbf{x}_i) = 1$，因此必须用自由支持向量计算 $b^*$。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>4.5 训练与预测</h3>
+  <p><strong>训练</strong>：求解对偶问题得到 $\boldsymbol{\alpha}^*$，然后恢复 $\mathbf{w}^*$ 和 $b^*$。</p>
+  <p><strong>预测</strong>：对新样本 $\mathbf{x}$，计算：</p>
+  <div class="formula">
+  $$f(\mathbf{x}) = \mathbf{w}^{*T}\mathbf{x} + b^* = \sum_{i \in SV} \alpha_i^* y_i \mathbf{x}_i^T \mathbf{x} + b^*$$
+  $$\hat{y} = \text{sign}(f(\mathbf{x}))$$
+  </div>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">注意</div>
+    预测公式中 $\mathbf{w}^*$ 不需要显式存储——只需存储支持向量 $\{\mathbf{x}_i, y_i, \alpha_i^*\}_{i \in SV}$ 和 $b^*$。这对于核SVM尤其重要，因为在高维特征空间中 $\mathbf{w}^*$ 可能无法显式表示。
+  </div>
+</section>
+
+<!-- ============ 章节：硬间隔 - 手算示例 ============ -->
+<section id="hard-example" class="chapter" style="display:none">
+  <h2><span class="num">5</span>手算示例：完整走一遍</h2>
+  <p class="lead">用最简单的两个样本的例子，手算完成从对偶问题求解到恢复边界的全过程，验证 $p^* = d^*$。</p>
+
+  <h3>5.1 问题设定</h3>
+  <div class="formula">
+  $$\mathbf{x}_1 = (0, 0)^T,\ y_1 = -1;\qquad \mathbf{x}_2 = (2, 2)^T,\ y_2 = +1$$
+  </div>
+  <p>两个样本：原点为负类，(2,2)为正类。显然线性可分。</p>
+
+  <h3>5.2 步骤1：由等式约束化简</h3>
+  <p>对偶问题的等式约束 $\sum_{i=1}^n \alpha_i y_i = 0$ 给出：</p>
+  <div class="formula">
+  $$-\alpha_1 + \alpha_2 = 0 \implies \alpha_1 = \alpha_2 = a \ge 0$$
+  </div>
+  <p>两个变量化为一个变量 $a$。</p>
+
+  <h3>5.3 步骤2：计算内积矩阵</h3>
+  <div class="formula">
+  $$\mathbf{K} = \begin{pmatrix} \mathbf{x}_1^T\mathbf{x}_1 & \mathbf{x}_1^T\mathbf{x}_2 \\ \mathbf{x}_2^T\mathbf{x}_1 & \mathbf{x}_2^T\mathbf{x}_2 \end{pmatrix} = \begin{pmatrix} 0 & 0 \\ 0 & 8 \end{pmatrix}$$
+  </div>
+  <p>验证：$\mathbf{x}_1^T\mathbf{x}_1 = 0^2+0^2 = 0$，$\mathbf{x}_1^T\mathbf{x}_2 = 0\times2+0\times2 = 0$，$\mathbf{x}_2^T\mathbf{x}_2 = 2^2+2^2 = 8$。</p>
+
+  <h3>5.4 步骤3：写出对偶目标并化简</h3>
+  <p>对偶目标 $W(\boldsymbol{\alpha}) = \sum \alpha_i - \frac{1}{2}\sum_{i,j} \alpha_i \alpha_j y_i y_j \mathbf{x}_i^T\mathbf{x}_j$：</p>
+  <div class="formula">
+  $$W(a) = 2a - \frac{1}{2}\left[\alpha_1^2 y_1^2 K_{11} + \alpha_1\alpha_2 y_1 y_2 K_{12} + \alpha_2\alpha_1 y_2 y_1 K_{21} + \alpha_2^2 y_2^2 K_{22}\right]$$
+  </div>
+  <p>代入 $\alpha_1 = \alpha_2 = a$，$y_1 = -1, y_2 = +1$，$K_{11}=0, K_{12}=K_{21}=0, K_{22}=8$：</p>
+  <div class="formula">
+  $$W(a) = 2a - \frac{1}{2}[0 + 0 + 0 + a^2 \cdot 1 \cdot 8] = 2a - 4a^2$$
+  </div>
+
+  <h3>5.5 步骤4：求最大值</h3>
+  <p>对 $a$ 求导：</p>
+  <div class="formula">
+  $$W'(a) = 2 - 8a = 0 \implies a^* = \frac{1}{4}$$
+  </div>
+  <p>二阶导数 $W''(a) = -8 < 0$，确为极大值。因此：</p>
+  <div class="formula">
+  $$\alpha_1^* = \alpha_2^* = \frac{1}{4}$$
+  </div>
+  <p>对偶最优值：$d^* = W(\frac{1}{4}) = 2 \times \frac{1}{4} - 4 \times (\frac{1}{4})^2 = \frac{1}{2} - \frac{1}{4} = \frac{1}{4}$。</p>
+
+  <h3>5.6 步骤5：恢复 w*</h3>
+  <div class="formula">
+  $$\mathbf{w}^* = \alpha_1^* y_1 \mathbf{x}_1 + \alpha_2^* y_2 \mathbf{x}_2 = \frac{1}{4}(-1)(0,0)^T + \frac{1}{4}(+1)(2,2)^T = \left(\frac{1}{2}, \frac{1}{2}\right)^T$$
+  </div>
+
+  <h3>5.7 步骤6：恢复 b*</h3>
+  <p>用支持向量 $\mathbf{x}_1$（$\alpha_1^* = 1/4 > 0$）：</p>
+  <div class="formula">
+  $$b^* = y_1 - \mathbf{w}^{*T}\mathbf{x}_1 = -1 - \left(\frac{1}{2} \times 0 + \frac{1}{2} \times 0\right) = -1$$
+  </div>
+  <p>用支持向量 $\mathbf{x}_2$ 验证：$b^* = y_2 - \mathbf{w}^{*T}\mathbf{x}_2 = 1 - (\frac{1}{2} \times 2 + \frac{1}{2} \times 2) = 1 - 2 = -1$。一致！</p>
+
+  <h3>5.8 步骤7：得到分类边界</h3>
+  <div class="formula">
+  $$H: \frac{1}{2}x_1 + \frac{1}{2}x_2 - 1 = 0 \implies x_1 + x_2 = 2$$
+  </div>
+  <p>支撑线：$H_+: x_1 + x_2 = 4$（正类侧），$H_-: x_1 + x_2 = 0$（负类侧）。</p>
+
+  <h3>5.9 验证最优值一致</h3>
+  <p>原问题最优值：</p>
+  <div class="formula">
+  $$p^* = \frac{1}{2}\|\mathbf{w}^*\|_2^2 = \frac{1}{2}\left[\left(\frac{1}{2}\right)^2 + \left(\frac{1}{2}\right)^2\right] = \frac{1}{2} \times \frac{1}{2} = \frac{1}{4}$$
+  </div>
+  <p>对偶最优值 $d^* = \frac{1}{4}$。<strong>$p^* = d^* = \frac{1}{4}$，强对偶验证通过！</strong></p>
+
+  <h3>5.10 验证约束</h3>
+  <table>
+    <colgroup><col style="width:20%"><col style="width:30%"><col style="width:25%"><col style="width:25%"></colgroup>
+    <thead><tr><th>样本</th><th>$y_i f(\mathbf{x}_i)$</th><th>约束 $\ge 1$</th><th>$\alpha_i^*$</th></tr></thead>
+    <tbody>
+      <tr><td>$\mathbf{x}_1 = (0,0), y=-1$</td><td>$-1 \times (-1) = 1$</td><td>满足（等号）</td><td>$1/4 > 0$（支持向量）</td></tr>
+      <tr><td>$\mathbf{x}_2 = (2,2), y=+1$</td><td>$+1 \times (2-1) = 1$</td><td>满足（等号）</td><td>$1/4 > 0$（支持向量）</td></tr>
+    </tbody>
+  </table>
+  <p>两个样本都在支撑线上，都是支持向量。互补松弛条件 $\alpha_i^* [y_i f(\mathbf{x}_i) - 1] = \frac{1}{4} \times 0 = 0$ 满足。</p>
+
+  <div class="demo-card">
+    <div class="demo-title">可视化：手算示例的决策边界</div>
+    <div class="demo-desc">下图展示了两个样本点、最优分类边界 $x_1+x_2=2$，以及两条支撑线。两个样本都是支持向量。</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="exampleCanvas" width="600" height="400"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 章节：软间隔 - 松弛变量 ============ -->
+<section id="soft-intro" class="chapter" style="display:none">
+  <h2><span class="num">6</span>软间隔SVM：松弛变量与hinge损失</h2>
+
+  <h3>6.1 为什么需要软间隔？</h3>
+  <p>硬间隔SVM要求数据严格线性可分。但现实中：</p>
+  <ul style="margin:0 0 14px 24px">
+    <li>数据中存在噪声和异常点</li>
+    <li>两类样本本身就有重叠，无法用超平面完全分开</li>
+    <li>即使线性可分，硬间隔可能被单个异常点"带偏"，导致间隔很小</li>
+  </ul>
+  <p>软间隔SVM允许部分样本违反间隔要求，通过松弛变量量化违反程度，并用参数 $C$ 控制惩罚力度。</p>
+
+  <h3>6.2 松弛变量 ξᵢ</h3>
+  <p>对每个样本引入松弛变量 $\xi_i \ge 0$，将硬间隔约束放松为：</p>
+  <div class="formula">
+  $$y_i(\mathbf{w}^T\mathbf{x}_i + b) \ge 1 - \xi_i,\quad \xi_i \ge 0,\quad i = 1, \dots, n$$
+  </div>
+  <p>$\xi_i$ 衡量样本 $i$ 违反间隔要求的程度：</p>
+
+  <div class="demo-card">
+    <div class="demo-title">四种样本位置与对应的 ξ 值（正类样本 y=+1）</div>
+    <div class="demo-desc">固定边界后，根据样本位置确定最小松弛量。点击按钮可切换查看不同位置。</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="xiCanvas" width="600" height="350"></canvas>
+    </div>
+    <div class="demo-controls">
+      <button class="btn" onclick="drawXi('A')">A: ξ=0 间隔外</button>
+      <button class="btn" onclick="drawXi('B')">B: ξ=0.5 间隔内</button>
+      <button class="btn" onclick="drawXi('C')">C: ξ=1 边界上</button>
+      <button class="btn" onclick="drawXi('D')">D: ξ=2 误分类</button>
+    </div>
+  </div>
+
+  <table>
+    <colgroup><col style="width:15%"><col style="width:20%"><col style="width:30%"><col style="width:35%"></colgroup>
+    <thead><tr><th>位置</th><th>$\xi_i$</th><th>$y_i f(\mathbf{x}_i)$</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>A: 间隔外正确</td><td>$\xi = 0$</td><td>$\ge 1$</td><td>满足间隔要求，无违反</td></tr>
+      <tr><td>B: 间隔内正确</td><td>$0 < \xi < 1$</td><td>$(0, 1)$</td><td>分类正确但进入间隔区域</td></tr>
+      <tr><td>C: 边界上</td><td>$\xi = 1$</td><td>$= 0$</td><td>恰在分类边界上</td></tr>
+      <tr><td>D: 误分类</td><td>$\xi > 1$</td><td>$< 0$</td><td>被错误分类</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.3 最小松弛量与hinge损失</h3>
+  <p>固定 $\mathbf{w}, b$ 时，满足约束的最小 $\xi_i$ 为：</p>
+  <div class="formula">
+  $$\xi_i = \max\{0,\ 1 - y_i(\mathbf{w}^T\mathbf{x}_i + b)\}$$
+  </div>
+  <p>这就是<strong>合页损失 (hinge loss)</strong>。函数图像像一个合页（铰链），在 $y_i f(\mathbf{x}_i) \ge 1$ 时损失为0，之后线性增长。</p>
+
+  <div class="demo-card">
+    <div class="demo-title">hinge 损失函数图像</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="hingeCanvas" width="600" height="300"></canvas>
+    </div>
+    <div class="demo-stats">
+      <div class="demo-stat">横轴：$y f(\mathbf{x})$（函数间隔）</div>
+      <div class="demo-stat">纵轴：$\max(0, 1-yf(\mathbf{x}))$（hinge损失）</div>
+    </div>
+  </div>
+
+  <h3>6.4 软间隔原问题</h3>
+  <div class="formula">
+  $$\min_{\mathbf{w}, b, \boldsymbol{\xi}} \frac{1}{2}\|\mathbf{w}\|_2^2 + C\sum_{i=1}^n \xi_i$$
+  $$\text{s.t.} \quad y_i(\mathbf{w}^T\mathbf{x}_i + b) \ge 1 - \xi_i,\quad \xi_i \ge 0,\quad i = 1, \dots, n,\quad C > 0$$
+  </div>
+
+  <div class="callout callout-key">
+    <div class="callout-title">参数 C 的作用</div>
+    $C$ 是间隔宽度与分类错误之间的权衡参数：
+    <ul style="margin:8px 0 0 20px">
+      <li><strong>$C$ 大</strong>：对违反间隔的惩罚重 → 尽量减少违反 → 间隔可能变窄 → 容易过拟合</li>
+      <li><strong>$C$ 小</strong>：对违反间隔的惩罚轻 → 容忍更多违反 → 间隔更宽 → 可能欠拟合</li>
+      <li><strong>$C \to \infty$</strong>：退化为硬间隔SVM（不允许任何违反）</li>
+    </ul>
+  </div>
+
+  <h3>6.5 消去 ξ 的等价形式</h3>
+  <p>将最小松弛量 $\xi_i = \max\{0, 1 - y_i f(\mathbf{x}_i)\}$ 代入目标，得到无约束等价问题：</p>
+  <div class="formula">
+  $$\min_{\mathbf{w}, b} \frac{1}{2}\|\mathbf{w}\|_2^2 + C\sum_{i=1}^n \max\{0,\ 1 - y_i(\mathbf{w}^T\mathbf{x}_i + b)\}$$
+  </div>
+  <p>这清楚地展示了SVM的目标 = <strong>结构风险</strong>（$\frac{1}{2}\|\mathbf{w}\|^2$，控制模型复杂度）+ <strong>经验风险</strong>（hinge损失之和，控制训练误差），$C$ 是两者的权衡系数。</p>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么消去 ξ 后是等价的？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>原问题中，对于固定的 $\mathbf{w}, b$，目标函数中关于 $\xi_i$ 的部分是 $C\xi_i$，约束为 $\xi_i \ge \max\{0, 1 - y_i f(\mathbf{x}_i)\}$ 且 $\xi_i \ge 0$。</p>
+        <p>由于 $C > 0$，最小化 $C\xi_i$ 会取 $\xi_i$ 的最小可行值，即 $\xi_i = \max\{0, 1 - y_i f(\mathbf{x}_i)\}$。</p>
+        <p>将其代入目标，就得到了只含 $\mathbf{w}, b$ 的等价无约束问题。两个问题的最优 $(\mathbf{w}, b)$ 完全相同。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 章节：软间隔 - 对偶问题 ============ -->
+<section id="soft-dual" class="chapter" style="display:none">
+  <h2><span class="num">7</span>软间隔SVM：对偶问题推导</h2>
+
+  <h3>7.1 构造拉格朗日函数</h3>
+  <p>软间隔原问题有两类约束：间隔约束 $1 - \xi_i - y_i(\mathbf{w}^T\mathbf{x}_i + b) \le 0$ 和非负约束 $-\xi_i \le 0$。分别引入乘子 $\alpha_i \ge 0$ 和 $\mu_i \ge 0$：</p>
+  <div class="formula">
+  $$L(\mathbf{w}, b, \boldsymbol{\xi}, \boldsymbol{\alpha}, \boldsymbol{\mu}) = \frac{1}{2}\|\mathbf{w}\|_2^2 + C\sum_{i=1}^n \xi_i + \sum_{i=1}^n \alpha_i\left[1 - \xi_i - y_i(\mathbf{w}^T\mathbf{x}_i + b)\right] - \sum_{i=1}^n \mu_i \xi_i$$
+  </div>
+
+  <h3>7.2 对原始变量求极小</h3>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">1</span>
+        <span class="derive-step-title">对 w 求极小</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula">$\nabla_{\mathbf{w}} L = \mathbf{w} - \sum_{i=1}^n \alpha_i y_i \mathbf{x}_i = \mathbf{0} \implies \mathbf{w}^* = \sum_{i=1}^n \alpha_i y_i \mathbf{x}_i$</div>
+        <p>与硬间隔完全相同。</p>
+      </div>
+    </div>
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">2</span>
+        <span class="derive-step-title">对 b 求极小</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula">$\frac{\partial L}{\partial b} = -\sum_{i=1}^n \alpha_i y_i = 0 \implies \sum_{i=1}^n \alpha_i y_i = 0$</div>
+        <p>与硬间隔完全相同。</p>
+      </div>
+    </div>
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">3</span>
+        <span class="derive-step-title">对 ξᵢ 求极小（关键差异！）</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>$L$ 中含 $\xi_i$ 的项为：$C\xi_i - \alpha_i \xi_i - \mu_i \xi_i = (C - \alpha_i - \mu_i)\xi_i$</p>
+        <div class="formula">$\frac{\partial L}{\partial \xi_i} = C - \alpha_i - \mu_i = 0 \implies \mu_i = C - \alpha_i$</div>
+        <p>由于 $\mu_i \ge 0$，得到 $C - \alpha_i \ge 0$，即 $\alpha_i \le C$。</p>
+        <p><strong>这就是软间隔与硬间隔对偶问题的核心区别：$\alpha_i$ 有了上界 $C$。</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <h3>7.3 软间隔对偶问题</h3>
+  <p>将 $\mathbf{w} = \sum \alpha_i y_i \mathbf{x}_i$、$\sum \alpha_i y_i = 0$、$\mu_i = C - \alpha_i$ 代回 $L$，二次项合并过程与硬间隔完全相同，得到对偶函数：</p>
+  <div class="formula">
+  $$g(\boldsymbol{\alpha}) = \sum_{i=1}^n \alpha_i - \frac{1}{2}\sum_{i=1}^n \sum_{j=1}^n \alpha_i \alpha_j y_i y_j \mathbf{x}_i^T \mathbf{x}_j$$
+  </div>
+  <p>对偶问题为：</p>
+  <div class="formula">
+  $$\max_{\boldsymbol{\alpha} \in \mathbb{R}^n} \sum_{i=1}^n \alpha_i - \frac{1}{2}\sum_{i,j} \alpha_i \alpha_j y_i y_j \mathbf{x}_i^T \mathbf{x}_j$$
+  $$\text{s.t.} \quad 0 \le \alpha_i \le C,\ i = 1, \dots, n; \qquad \sum_{i=1}^n \alpha_i y_i = 0$$
+  </div>
+
+  <div class="callout callout-key">
+    <div class="callout-title">硬间隔 vs 软间隔对偶问题</div>
+    目标函数完全相同，唯一区别是约束：硬间隔 $\alpha_i \ge 0$，软间隔 $0 \le \alpha_i \le C$。上界 $C$ 限制了单个样本对决策函数的影响力，防止异常点主导边界。
+  </div>
+
+  <h3>7.4 软间隔的KKT条件与支持向量分类</h3>
+  <p>软间隔的KKT条件中，互补松弛有两组：</p>
+  <div class="formula">
+  $$\alpha_i [y_i f(\mathbf{x}_i) - 1 + \xi_i] = 0 \quad \text{(间隔约束)}$$
+  $$\mu_i \xi_i = (C - \alpha_i) \xi_i = 0 \quad \text{(非负约束)}$$
+  </div>
+  <p>根据 $\alpha_i$ 的取值，样本分为三类：</p>
+
+  <table>
+    <colgroup><col style="width:22%"><col style="width:20%"><col style="width:28%"><col style="width:30%"></colgroup>
+    <thead><tr><th>条件</th><th>$\xi_i$</th><th>$y_i f(\mathbf{x}_i)$</th><th>样本类型</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>$\alpha_i^* = 0$</td>
+        <td>$\xi_i = 0$</td>
+        <td>$\ge 1$</td>
+        <td>间隔外，非支持向量</td>
+      </tr>
+      <tr>
+        <td>$0 < \alpha_i^* < C$</td>
+        <td>$\xi_i = 0$</td>
+        <td>$= 1$</td>
+        <td><strong>自由支持向量</strong>，在支撑线上</td>
+      </tr>
+      <tr>
+        <td>$\alpha_i^* = C$</td>
+        <td>$\xi_i \ge 0$</td>
+        <td>$\le 1$</td>
+        <td>有界支持向量，在间隔内或误分类</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么 0 &lt; α &lt; C 时 ξ=0 且 yf(x)=1？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>当 $0 < \alpha_i < C$ 时：</p>
+        <p>1. 由 $(C - \alpha_i)\xi_i = 0$，且 $C - \alpha_i > 0$，得 $\xi_i = 0$。</p>
+        <p>2. 由 $\alpha_i [y_i f(\mathbf{x}_i) - 1 + \xi_i] = 0$，且 $\alpha_i > 0$，得 $y_i f(\mathbf{x}_i) - 1 + \xi_i = 0$。</p>
+        <p>3. 代入 $\xi_i = 0$，得 $y_i f(\mathbf{x}_i) = 1$。</p>
+        <p>因此自由支持向量恰好在支撑线上，与硬间隔的支持向量相同。</p>
+      </div>
+    </div>
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么 α = C 时样本可能在间隔内或误分类？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>当 $\alpha_i = C$ 时：</p>
+        <p>1. 由 $(C - \alpha_i)\xi_i = 0 \cdot \xi_i = 0$，此条件自动满足，$\xi_i$ 可以大于0。</p>
+        <p>2. 由 $\alpha_i [y_i f(\mathbf{x}_i) - 1 + \xi_i] = 0$，且 $\alpha_i = C > 0$，得 $y_i f(\mathbf{x}_i) = 1 - \xi_i$。</p>
+        <p>3. 由于 $\xi_i \ge 0$，所以 $y_i f(\mathbf{x}_i) \le 1$。</p>
+        <p>- 当 $0 < \xi_i < 1$ 时，$0 < y_i f(\mathbf{x}_i) < 1$：分类正确但在间隔内</p>
+        <p>- 当 $\xi_i = 1$ 时，$y_i f(\mathbf{x}_i) = 0$：在边界上</p>
+        <p>- 当 $\xi_i > 1$ 时，$y_i f(\mathbf{x}_i) < 0$：误分类</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>7.5 恢复 b*</h3>
+  <p>只有自由支持向量（$0 < \alpha_i^* < C$）满足 $y_i f(\mathbf{x}_i) = 1$，因此用它们计算 $b^*$：</p>
+  <div class="formula">
+  $$b^* = y_j - \mathbf{w}^{*T}\mathbf{x}_j,\quad j \in S_f = \{i: 0 < \alpha_i^* < C\}$$
+  </div>
+  <p>实践中取所有自由支持向量计算结果的平均值。如果 $S_f$ 为空（极端情况），则需要通过其他方式估计 $b^*$。</p>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">注意</div>
+    不能用 $\alpha_i = C$ 的支持向量计算 $b^*$，因为它们不满足 $y_i f(\mathbf{x}_i) = 1$（而是 $y_i f(\mathbf{x}_i) = 1 - \xi_i \le 1$）。
+  </div>
+</section>
+
+<!-- ============ 章节：核方法 - 特征映射与核技巧 ============ -->
+<section id="kernel-idea" class="chapter" style="display:none">
+  <h2><span class="num">8</span>非线性SVM：特征映射与核技巧</h2>
+
+  <h3>8.1 问题：线性不可分</h3>
+  <p>当数据在原空间中线性不可分时，线性SVM（即使是软间隔）无法获得好的分类效果。核心思想：<strong>将数据映射到更高维的特征空间，在新空间中数据可能线性可分</strong>。</p>
+
+  <div class="formula">
+  $$\phi: \mathbb{R}^d \to \mathbb{R}^D,\quad D > d \text{（甚至 } D = \infty\text{）}$$
+  </div>
+
+  <h3>8.2 升维实例：一维到二维</h3>
+  <p>考虑一维数据：正类在 $\{|x| > \sqrt{2.5}\}$，负类在中间。单个阈值无法分开（负类被正类夹在中间）。</p>
+  <p>定义映射 $\phi(x) = (x, x^2)^T$，将一维数据映射到二维：</p>
+  <div class="formula">
+  $$f(x) = x^2 - 2.5,\quad \hat{y} = \text{sign}(f(x))$$
+  </div>
+  <p>在二维空间中，决策边界为 $z_2 = 2.5$（一条水平线），可以完美分开两类。</p>
+
+  <div class="demo-card">
+    <div class="demo-title">交互式演示：一维数据映射到二维</div>
+    <div class="demo-desc">左图：一维空间中，负类（红）被正类（绿）夹在中间，无法用单个阈值分开。右图：映射到二维空间 (x, x²) 后，用水平线 z₂=2.5 即可分开。拖动滑块改变阈值。</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="liftCanvas" width="600" height="320"></canvas>
+    </div>
+    <div class="demo-controls">
+      <div class="demo-control">
+        <label>阈值 z₂</label>
+        <input type="range" id="lift_thresh" min="0.5" max="5" step="0.1" value="2.5">
+        <span class="val" id="lift_thresh_val">2.5</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>8.3 线性预测 vs 核化预测</h3>
+  <p>线性SVM的预测函数：</p>
+  <div class="formula">
+  $$f_{\text{lin}}(\mathbf{x}) = \sum_{i=1}^n \alpha_i^* y_i \mathbf{x}_i^T \mathbf{x} + b^*$$
+  </div>
+  <p>将 $\mathbf{x}$ 替换为 $\phi(\mathbf{x})$，得到特征空间中的线性预测：</p>
+  <div class="formula">
+  $$f_\phi(\mathbf{x}) = \sum_{i=1}^n \alpha_i^* y_i \phi(\mathbf{x}_i)^T \phi(\mathbf{x}) + b^*$$
+  </div>
+  <p>注意：数据只通过<strong>特征空间中的内积</strong> $\phi(\mathbf{x}_i)^T \phi(\mathbf{x})$ 参与计算。</p>
+
+  <h3>8.4 核技巧 (Kernel Trick)</h3>
+  <p>定义<strong>核函数</strong>：</p>
+  <div class="formula">
+  $$K(\mathbf{x}, \mathbf{z}) = \langle \phi(\mathbf{x}), \phi(\mathbf{z}) \rangle = \phi(\mathbf{x})^T \phi(\mathbf{z})$$
+  </div>
+  <p><strong>核技巧</strong>：不需要显式计算 $\phi(\mathbf{x})$，只需直接计算核函数值 $K(\mathbf{x}, \mathbf{z})$。对偶问题中所有 $\mathbf{x}_i^T \mathbf{x}_j$ 替换为 $K(\mathbf{x}_i, \mathbf{x}_j)$：</p>
+  <div class="formula">
+  $$\max_{\boldsymbol{\alpha}} \sum_{i=1}^n \alpha_i - \frac{1}{2}\sum_{i,j} \alpha_i \alpha_j y_i y_j K(\mathbf{x}_i, \mathbf{x}_j)$$
+  $$\text{s.t.} \quad 0 \le \alpha_i \le C,\quad \sum \alpha_i y_i = 0$$
+  </div>
+
+  <div class="callout callout-key">
+    <div class="callout-title">核技巧的威力</div>
+    特征空间的维数 $D$ 可以非常大甚至无穷维（如高斯核对应无穷维特征空间），但我们只需要计算 $n \times n$ 的核矩阵，计算复杂度只依赖样本数 $n$，不依赖特征维数 $D$。这使得在无穷维空间中学习线性分类器成为可能。
+  </div>
+
+  <h3>8.5 核矩阵与半正定性</h3>
+  <p>定义<strong>核矩阵</strong> $\mathbf{K} = (K_{ij})_{n \times n}$，其中 $K_{ij} = K(\mathbf{x}_i, \mathbf{x}_j)$。</p>
+  <p>合法的核函数必须满足：</p>
+  <div class="formula">
+  $$\mathbf{K} = \mathbf{K}^T \quad \text{(对称性)},\qquad \mathbf{a}^T \mathbf{K} \mathbf{a} \ge 0,\ \forall \mathbf{a} \in \mathbb{R}^n \quad \text{(半正定性)}$$
+  </div>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">为什么核矩阵必须半正定？</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>如果 $K(\mathbf{x}, \mathbf{z}) = \phi(\mathbf{x})^T \phi(\mathbf{z})$，则对任意 $\mathbf{a} \in \mathbb{R}^n$：</p>
+        <div class="formula">$\mathbf{a}^T \mathbf{K} \mathbf{a} = \sum_{i,j} a_i a_j K(\mathbf{x}_i, \mathbf{x}_j) = \sum_{i,j} a_i a_j \phi(\mathbf{x}_i)^T \phi(\mathbf{x}_j)$</div>
+        <div class="formula">$= \left(\sum_i a_i \phi(\mathbf{x}_i)\right)^T \left(\sum_j a_j \phi(\mathbf{x}_j)\right) = \left\|\sum_i a_i \phi(\mathbf{x}_i)\right\|^2 \ge 0$</div>
+        <p>因此半正定性是核函数对应某个特征映射的必要条件。Mercer定理表明，这也是充分条件（在一定条件下）。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>8.6 核函数的运算封闭性</h3>
+  <p>如果 $K_1, K_2$ 是合法核函数，则以下也是合法核函数：</p>
+  <ul style="margin:0 0 14px 24px">
+    <li>$K_1 + K_2$（和）</li>
+    <li>$K_1 \cdot K_2$（积）</li>
+    <li>$c \cdot K_1$（$c > 0$，数乘）</li>
+    <li>$f(\mathbf{x}) K_1(\mathbf{x},\mathbf{z}) f(\mathbf{z})$（加权）</li>
+  </ul>
+  <p>这意味着可以通过组合简单核函数构造复杂核函数。</p>
+</section>
+
+<!-- ============ 章节：核方法 - 核函数详解 ============ -->
+<section id="kernel-types" class="chapter" style="display:none">
+  <h2><span class="num">9</span>三种常用核函数详解</h2>
+
+  <h3>9.1 线性核 (Linear Kernel)</h3>
+  <div class="formula">
+  $$K(\mathbf{x}, \mathbf{z}) = \mathbf{x}^T \mathbf{z}$$
+  </div>
+  <p>对应特征映射 $\phi(\mathbf{x}) = \mathbf{x}$（恒等映射），即不做任何升维。等价于线性SVM。</p>
+  <p><strong>适用场景</strong>：特征维数 $d$ 已经很高（如文本分类的词袋表示），样本数相对较少时。线性核训练快、可解释性好。</p>
+
+  <h3>9.2 多项式核 (Polynomial Kernel)</h3>
+  <div class="formula">
+  $$K(\mathbf{x}, \mathbf{z}) = (\gamma \mathbf{x}^T \mathbf{z} + r)^p,\quad \gamma > 0,\ r \ge 0,\ p \in \mathbb{N}^+$$
+  </div>
+  <p>参数：$\gamma$ 控制内积的缩放，$r$ 是常数项，$p$ 是多项式次数。</p>
+
+  <h4>二次多项式核的完整展开</h4>
+  <p>取 $\gamma = 1, r = 0, p = 2$，则 $K(\mathbf{x}, \mathbf{z}) = (\mathbf{x}^T\mathbf{z})^2$。</p>
+  <p>对二维 $\mathbf{x} = (x_1, x_2)^T$，$\mathbf{z} = (z_1, z_2)^T$：</p>
+  <div class="formula">
+  $$K(\mathbf{x}, \mathbf{z}) = (x_1 z_1 + x_2 z_2)^2 = x_1^2 z_1^2 + 2x_1 x_2 z_1 z_2 + x_2^2 z_2^2$$
+  </div>
+  <p>这对应特征映射：</p>
+  <div class="formula">
+  $$\phi(\mathbf{x}) = (x_1^2,\ \sqrt{2}x_1 x_2,\ x_2^2)^T \in \mathbb{R}^3$$
+  </div>
+  <p>验证：$\phi(\mathbf{x})^T \phi(\mathbf{z}) = x_1^2 z_1^2 + 2x_1 x_2 z_1 z_2 + x_2^2 z_2^2 = (\mathbf{x}^T\mathbf{z})^2$。</p>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">数值验证</div>
+    $\mathbf{x} = (1,2)^T$，$\mathbf{z} = (2,1)^T$：<br>
+    $\mathbf{x}^T\mathbf{z} = 1\times2 + 2\times1 = 4$，$K = 4^2 = 16$<br>
+    $\phi(\mathbf{x}) = (1, 2\sqrt{2}, 4)^T$，$\phi(\mathbf{z}) = (4, 2\sqrt{2}, 1)^T$<br>
+    $\phi(\mathbf{x})^T\phi(\mathbf{z}) = 4 + 8 + 4 = 16$，验证通过
+  </div>
+
+  <p><strong>适用场景</strong>：数据具有多项式结构时。$p$ 越大，决策边界越复杂，越容易过拟合。常用 $p=2$ 或 $p=3$。</p>
+
+  <h3>9.3 高斯核 / RBF核 (Radial Basis Function)</h3>
+  <div class="formula">
+  $$K(\mathbf{x}, \mathbf{z}) = e^{-\gamma \|\mathbf{x} - \mathbf{z}\|_2^2},\quad \gamma > 0$$
+  </div>
+  <p>也可写成 $K(\mathbf{x}, \mathbf{z}) = e^{-\|\mathbf{x}-\mathbf{z}\|^2 / (2\sigma^2)}$，其中 $\gamma = \frac{1}{2\sigma^2}$，$\sigma$ 是高斯分布的标准差。</p>
+
+  <h4>性质</h4>
+  <ul style="margin:0 0 14px 24px">
+    <li>$K(\mathbf{x}, \mathbf{x}) = e^0 = 1$</li>
+    <li>$0 < K(\mathbf{x}, \mathbf{z}) \le 1$（距离越远，核值越小）</li>
+    <li>对称性：$K(\mathbf{x}, \mathbf{z}) = K(\mathbf{z}, \mathbf{x})$</li>
+  </ul>
+
+  <h4>无穷维特征展开</h4>
+  <div class="formula">
+  $$K(\mathbf{x}, \mathbf{z}) = e^{-\gamma\|\mathbf{x}\|^2} e^{-\gamma\|\mathbf{z}\|^2} \sum_{k=0}^{\infty} \frac{(2\gamma \mathbf{x}^T\mathbf{z})^k}{k!}$$
+  </div>
+  <p>这表明高斯核对应一个无穷维的特征空间。展开式中的每一项对应不同阶的多项式特征，加权系数为 $\frac{(2\gamma)^k}{k!}$。</p>
+
+  <div class="derive-steps">
+    <div class="derive-step">
+      <div class="derive-step-header">
+        <span class="derive-step-num">?</span>
+        <span class="derive-step-title">无穷维展开的推导</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <p>利用指数函数的泰勒展开 $e^t = \sum_{k=0}^{\infty} \frac{t^k}{k!}$：</p>
+        <div class="formula">$K(\mathbf{x},\mathbf{z}) = e^{-\gamma\|\mathbf{x}-\mathbf{z}\|^2} = e^{-\gamma(\|\mathbf{x}\|^2 - 2\mathbf{x}^T\mathbf{z} + \|\mathbf{z}\|^2)}$</div>
+        <div class="formula">$= e^{-\gamma\|\mathbf{x}\|^2} e^{-\gamma\|\mathbf{z}\|^2} e^{2\gamma \mathbf{x}^T\mathbf{z}}$</div>
+        <div class="formula">$= e^{-\gamma\|\mathbf{x}\|^2} e^{-\gamma\|\mathbf{z}\|^2} \sum_{k=0}^{\infty} \frac{(2\gamma \mathbf{x}^T\mathbf{z})^k}{k!}$</div>
+        <p>每一项 $(2\gamma \mathbf{x}^T\mathbf{z})^k / k!$ 展开后是 $k$ 次多项式的内积形式，因此整体对应无穷维特征空间。</p>
+      </div>
+    </div>
+  </div>
+
+  <h4>参数 γ 的作用</h4>
+  <div class="demo-card">
+    <div class="demo-title">交互式演示：高斯核函数截面与 γ 的影响</div>
+    <div class="demo-desc">一维高斯核 $K(x,0) = e^{-\gamma x^2}$ 的图像。γ 越大，核值随距离衰减越快，单个样本的影响范围越小。</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="rbfCanvas" width="600" height="300"></canvas>
+    </div>
+    <div class="demo-controls">
+      <div class="demo-control">
+        <label>γ</label>
+        <input type="range" id="rbf_gamma" min="0.05" max="5" step="0.05" value="1">
+        <span class="val" id="rbf_gamma_val">1.00</span>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <colgroup><col style="width:20%"><col style="width:40%"><col style="width:40%"></colgroup>
+    <thead><tr><th>γ 取值</th><th>影响范围</th><th>过拟合风险</th></tr></thead>
+    <tbody>
+      <tr><td>γ 大</td><td>单个样本影响范围小，决策边界曲折</td><td>高，容易过拟合</td></tr>
+      <tr><td>γ 小</td><td>单个样本影响范围大，决策边界平滑</td><td>低，可能欠拟合</td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>适用场景</strong>：最通用的核函数，在没有先验知识时通常首选RBF核。通过交叉验证选择合适的 $\gamma$ 和 $C$。</p>
+
+  <h3>9.4 三种核函数对比</h3>
+  <table>
+    <colgroup><col style="width:15%"><col style="width:30%"><col style="width:25%"><col style="width:30%"></colgroup>
+    <thead><tr><th>核函数</th><th>决策边界形状</th><th>参数</th><th>适用场景</th></tr></thead>
+    <tbody>
+      <tr><td>线性核</td><td>线性（超平面）</td><td>无</td><td>高维稀疏数据、文本分类</td></tr>
+      <tr><td>多项式核</td><td>多项式曲线</td><td>γ, r, p</td><td>数据有多项式结构</td></tr>
+      <tr><td>RBF核</td><td>任意复杂形状</td><td>γ</td><td>通用首选，低维数据</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 章节：核方法 - 核SVM预测 ============ -->
+<section id="kernel-predict" class="chapter" style="display:none">
+  <h2><span class="num">10</span>核SVM的预测与支持向量机总结</h2>
+
+  <h3>10.1 核SVM的完整预测表达</h3>
+  <p>定义支持向量集合 $S = \{i \in \{1, \dots, n\}: \alpha_i^* > 0\}$。核SVM的决策函数为：</p>
+  <div class="formula">
+  $$f(\mathbf{x}) = \sum_{i \in S} \alpha_i^* y_i K(\mathbf{x}_i, \mathbf{x}) + b^*$$
+  </div>
+  <p>预测规则：</p>
+  <div class="formula">
+  $$\hat{y}(\mathbf{x}) = \begin{cases} +1, & f(\mathbf{x}) \ge 0 \\ -1, & f(\mathbf{x}) < 0 \end{cases}$$
+  </div>
+
+  <div class="callout callout-key">
+    <div class="callout-title">为什么只需要支持向量？</div>
+    非支持向量的 $\alpha_i^* = 0$，在求和中贡献为0。因此预测时只需存储支持向量 $\{(\mathbf{x}_i, y_i, \alpha_i^*)\}_{i \in S}$ 和 $b^*$，不需要存储全部训练数据。这就是SVM解的稀疏性。
+  </div>
+
+  <h3>10.2 偏置 b* 的恢复</h3>
+  <p>对于软间隔核SVM，用自由支持向量 $S_f = \{i: 0 < \alpha_i^* < C\}$ 恢复 $b^*$：</p>
+  <div class="formula">
+  $$b^* = y_j - \sum_{i \in S} \alpha_i^* y_i K(\mathbf{x}_i, \mathbf{x}_j),\quad j \in S_f$$
+  </div>
+  <p>实践中取所有自由支持向量计算结果的平均值：</p>
+  <div class="formula">
+  $$b^* = \frac{1}{|S_f|} \sum_{j \in S_f} \left(y_j - \sum_{i \in S} \alpha_i^* y_i K(\mathbf{x}_i, \mathbf{x}_j)\right)$$
+  </div>
+
+  <h3>10.3 决策边界的可视化</h3>
+  <div class="demo-card">
+    <div class="demo-title">交互式演示：RBF核SVM的决策边界（调节 C 和 γ）</div>
+    <div class="demo-desc">双月数据集上的RBF核SVM。调节 C 和 γ 观察决策边界变化：C 控制间隔违反惩罚，γ 控制核函数局部性。红色区域为负类，绿色区域为正类，空心圈为支持向量。</div>
+    <div class="demo-canvas-wrap">
+      <canvas id="svmCanvas" width="600" height="450"></canvas>
+    </div>
+    <div class="demo-controls">
+      <div class="demo-control">
+        <label>C</label>
+        <input type="range" id="svm_C" min="0.01" max="100" step="0.01" value="1">
+        <span class="val" id="svm_C_val">1.0</span>
+      </div>
+      <div class="demo-control">
+        <label>γ</label>
+        <input type="range" id="svm_gamma" min="0.01" max="20" step="0.01" value="1">
+        <span class="val" id="svm_gamma_val">1.0</span>
+      </div>
+      <button class="btn" id="svm_retrain">重新训练</button>
+    </div>
+    <div class="demo-stats">
+      <div class="demo-stat">支持向量数 = <b id="svm_nsv">—</b></div>
+      <div class="demo-stat">训练准确率 = <b id="svm_acc">—</b></div>
+    </div>
+  </div>
+
+  <h3>10.4 SVM的统一视角</h3>
+  <p>将硬间隔、软间隔、线性核、非线性核统一在一个框架下：</p>
+  <div class="formula">
+  $$\min_{\mathbf{w}, b, \boldsymbol{\xi}} \frac{1}{2}\|\mathbf{w}\|_2^2 + C\sum_{i=1}^n \xi_i$$
+  $$\text{s.t.} \quad y_i(\langle \mathbf{w}, \phi(\mathbf{x}_i) \rangle + b) \ge 1 - \xi_i,\quad \xi_i \ge 0$$
+  </div>
+  <ul style="margin:0 0 14px 24px">
+    <li><strong>线性核</strong>：$\phi(\mathbf{x}) = \mathbf{x}$，在原空间学习线性分类器</li>
+    <li><strong>非线性核</strong>：$\phi(\mathbf{x})$ 为高维映射，在特征空间学习线性分类器</li>
+    <li><strong>硬间隔</strong>：$C \to \infty$，不允许任何违反</li>
+    <li><strong>软间隔</strong>：有限 $C$，允许违反但加以惩罚</li>
+  </ul>
+
+  <h3>10.5 SVM的优缺点</h3>
+  <div class="knowledge-grid">
+    <div class="k-card" style="border-left:3px solid var(--accent3)">
+      <div class="k-card-title">优点</div>
+      <div class="k-card-desc">
+        • 凸优化问题，全局最优解唯一<br>
+        • 解的稀疏性，预测效率高<br>
+        • 核技巧处理非线性问题<br>
+        • 泛化能力强，理论基础扎实<br>
+        • 高维数据表现好
+      </div>
+    </div>
+    <div class="k-card" style="border-left:3px solid var(--danger)">
+      <div class="k-card-title">缺点</div>
+      <div class="k-card-desc">
+        • 训练复杂度 $O(n^2)$ 到 $O(n^3)$，大数据集慢<br>
+        • 对核函数和参数敏感<br>
+        • 多分类需要特殊处理（OVO/OVR）<br>
+        • 不直接输出概率（需Platt缩放）<br>
+        • 特征缩放敏感
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 章节：实验 - 代码与调参 ============ -->
+<section id="exp-code" class="chapter" style="display:none">
+  <h2><span class="num">11</span>代码实验：scikit-learn实现与调参</h2>
+
+  <h3>11.1 实验设置</h3>
+  <ul style="margin:0 0 14px 24px">
+    <li>数据：<code>make_moons(n_samples=300, noise=0.23, random_state=42)</code></li>
+    <li>划分：训练集225个，测试集75个，分层抽样</li>
+    <li>标准化：$z$-score标准化，验证/测试集使用训练集统计量</li>
+    <li>模型：<code>SVC</code>（支持向量分类器）</li>
+  </ul>
+
+  <h3>11.2 核心代码</h3>
+  <pre><code>from sklearn.datasets import make_moons
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+
+# 生成数据
+X, y = make_moons(n_samples=300, noise=0.23, random_state=42)
+
+# 划分训练集和测试集
+Xtr, Xte, ytr, yte = train_test_split(
+    X, y, test_size=0.25, stratify=y, random_state=42)
+
+# 构建管道：标准化 + SVM
+model = make_pipeline(
+    StandardScaler(),
+    SVC(kernel="rbf", C=1, gamma=1)
+)
+
+# 训练
+model.fit(Xtr, ytr)
+
+# 预测
+y_pred = model.predict(Xte)
+
+# 评估
+accuracy = (y_pred == yte).mean()
+print(f"测试准确率: {accuracy:.4f}")
+print(f"支持向量数: {model.named_steps['svc'].n_support_}")</code></pre>
+
+  <h3>11.3 标准化的重要性</h3>
+  <p>SVM对特征尺度敏感：如果某个特征的数值范围远大于其他特征，它会主导距离计算（尤其是RBF核中的 $\|\mathbf{x}-\mathbf{z}\|^2$）。因此必须标准化：</p>
+  <div class="formula">
+  $$\tilde{x}_{ik} = \frac{x_{ik} - \mu_k}{s_k},\quad k = 1, \dots, d$$
+  </div>
+  <p>其中 $\mu_k = \frac{1}{N}\sum_{j \in T} x_{jk}$，$s_k = \sqrt{\frac{1}{N}\sum_{j \in T}(x_{jk} - \mu_k)^2}$，$T$ 为训练集。</p>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">数据泄露警告</div>
+    标准化的均值和标准差必须只从训练集计算，然后应用到验证集和测试集。如果用全量数据计算统计量，会导致测试集信息泄露到训练过程中，评估结果偏乐观。使用 Pipeline 可以自动避免这个问题。
+  </div>
+
+  <h3>11.4 参数 C 的影响</h3>
+  <table>
+    <colgroup><col style="width:15%"><col style="width:30%"><col style="width:30%"><col style="width:25%"></colgroup>
+    <thead><tr><th>C 值</th><th>间隔宽度</th><th>训练错误</th><th>泛化表现</th></tr></thead>
+    <tbody>
+      <tr><td>C = 0.01</td><td>很宽</td><td>较多</td><td>可能欠拟合</td></tr>
+      <tr><td>C = 1</td><td>适中</td><td>较少</td><td>通常较好</td></tr>
+      <tr><td>C = 100</td><td>很窄</td><td>很少</td><td>可能过拟合</td></tr>
+    </tbody>
+  </table>
+
+  <h3>11.5 参数 γ 的影响（RBF核）</h3>
+  <table>
+    <colgroup><col style="width:15%"><col style="width:30%"><col style="width:30%"><col style="width:25%"></colgroup>
+    <thead><tr><th>γ 值</th><th>样本影响范围</th><th>决策边界</th><th>泛化表现</th></tr></thead>
+    <tbody>
+      <tr><td>γ = 0.1</td><td>大（全局平滑）</td><td>平滑</td><td>可能欠拟合</td></tr>
+      <tr><td>γ = 1</td><td>适中</td><td>适中</td><td>通常较好</td></tr>
+      <tr><td>γ = 10</td><td>小（局部敏感）</td><td>曲折</td><td>可能过拟合</td></tr>
+    </tbody>
+  </table>
+
+  <h3>11.6 核函数选择指南</h3>
+  <div class="knowledge-grid">
+    <div class="k-card">
+      <div class="k-card-title">特征数 >> 样本数</div>
+      <div class="k-card-desc">用线性核。高维空间中数据通常已线性可分，线性核足够且训练快。</div>
+    </div>
+    <div class="k-card">
+      <div class="k-card-title">特征数少，样本数适中</div>
+      <div class="k-card-desc">用RBF核。低维数据通常需要非线性边界，RBF最通用。</div>
+    </div>
+    <div class="k-card">
+      <div class="k-card-title">特征数少，样本数极多</div>
+      <div class="k-card-desc">考虑线性核或主动学习。RBF核训练 $O(n^2)$ 可能太慢。</div>
+    </div>
+    <div class="k-card">
+      <div class="k-card-title">有领域先验</div>
+      <div class="k-card-desc">设计定制核函数。如文本分类用余弦相似度核，图数据用图核。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 章节：实验 - 交叉验证 ============ -->
+<section id="exp-cv" class="chapter" style="display:none">
+  <h2><span class="num">12</span>模型选择：交叉验证与评价</h2>
+
+  <h3>12.1 为什么需要交叉验证？</h3>
+  <p>参数 $C$ 和 $\gamma$ 的选择直接影响模型性能。不能在测试集上调参（会导致过拟合测试集），因此在训练集内部使用交叉验证选择最优参数。</p>
+
+  <h3>12.2 五折交叉验证</h3>
+  <p>将训练集分成5份，每次用4份训练、1份验证，轮换5次：</p>
+  <div class="formula">
+  $$CV(\theta) = \frac{1}{5}\sum_{k=1}^5 \frac{1}{|V_k|}\sum_{i \in V_k} \mathbb{I}\left(\hat{y}_i^{(-k)}(\theta) \neq y_i\right)$$
+  </div>
+  <p>其中 $\theta$ 是参数组合（如 $C, \gamma$），$V_k$ 是第 $k$ 折验证集，$\hat{y}_i^{(-k)}$ 是用不含第 $k$ 折的数据训练的模型对样本 $i$ 的预测。</p>
+  <p>选择使交叉验证准确率最高的参数：</p>
+  <div class="formula">
+  $$\theta^* \in \arg\max_{\theta \in \Theta} CV(\theta)$$
+  </div>
+
+  <h3>12.3 数据流</h3>
+  <div class="knowledge-grid" style="grid-template-columns:1fr">
+    <div class="k-card">
+      <div class="k-card-desc" style="font-size:14px;line-height:2">
+        <strong>完整流程</strong>：<br>
+        1. 原始数据 → 划分训练集(75%) + 测试集(25%)<br>
+        2. 训练集内部 → 五折交叉验证 → 选择最优 $(C, \gamma)$<br>
+        3. 用最优参数在<strong>全部训练集</strong>上重新训练<br>
+        4. 在<strong>测试集</strong>上评价最终性能（只做一次！）
+      </div>
+    </div>
+  </div>
+
+  <h3>12.4 网格搜索代码</h3>
+  <pre><code>from sklearn.model_selection import GridSearchCV
+
+param_grid = {
+    'svc__C': [0.01, 0.1, 1, 10, 100],
+    'svc__gamma': [0.01, 0.1, 1, 10, 100]
+}
+
+grid = GridSearchCV(
+    make_pipeline(StandardScaler(), SVC(kernel='rbf')),
+    param_grid,
+    cv=5,
+    scoring='accuracy',
+    n_jobs=-1
+)
+grid.fit(Xtr, ytr)
+
+print(f"最优参数: {grid.best_params_}")
+print(f"CV准确率: {grid.best_score_:.4f}")
+print(f"测试准确率: {grid.score(Xte, yte):.4f}")</code></pre>
+
+  <h3>12.5 课件实验结果</h3>
+  <table>
+    <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+    <tbody>
+      <tr><td>最优核函数</td><td>RBF</td></tr>
+      <tr><td>最优参数</td><td>$C = 10,\ \gamma = 10$</td></tr>
+      <tr><td>五折CV准确率</td><td>94.67%</td></tr>
+      <tr><td>测试集准确率</td><td>89.33%（67/75）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>12.6 混淆矩阵</h3>
+  <p>课件中测试集的混淆矩阵（对角线为正确预测）：</p>
+  <table>
+    <colgroup><col style="width:25%"><col style="width:25%"><col style="width:25%"><col style="width:25%"></colgroup>
+    <thead><tr><th></th><th>预测 -1</th><th>预测 +1</th><th>合计</th></tr></thead>
+    <tbody>
+      <tr><td>实际 -1</td><td><strong>32</strong></td><td>5</td><td>37</td></tr>
+      <tr><td>实际 +1</td><td>3</td><td><strong>35</strong></td><td>38</td></tr>
+      <tr><td>合计</td><td>35</td><td>40</td><td>75</td></tr>
+    </tbody>
+  </table>
+  <p>准确率 = (32 + 35) / 75 = 67/75 = 89.33%。</p>
+
+  <h3>12.7 实验任务</h3>
+  <ol style="margin:0 0 14px 24px">
+    <li>将 <code>noise</code> 改为 0.10 和 0.35，比较结果差异</li>
+    <li>将 <code>make_moons</code> 换为 <code>make_circles</code>，观察核函数表现</li>
+    <li>记录训练、验证、测试准确率及支持向量数</li>
+    <li>解释 $C$、$\gamma$ 与过拟合的关系</li>
+  </ol>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">过拟合判断</div>
+    如果训练准确率远高于验证/测试准确率，说明过拟合。此时应减小 $C$（放宽间隔约束）或减小 $\gamma$（增大样本影响范围，使边界更平滑）。如果训练和验证准确率都低，说明欠拟合，应增大 $C$ 或增大 $\gamma$。
+  </div>
+</section>
+
+<!-- ============ 章节：总结 - 知识图谱 ============ -->
+<section id="summary" class="chapter" style="display:none">
+  <h2><span class="num">13</span>知识图谱与完整推导链路</h2>
+
+  <h3>13.1 完整知识链路</h3>
+  <div class="knowledge-grid" style="grid-template-columns:1fr">
+    <div class="k-card" style="padding:24px">
+      <div class="k-card-desc" style="font-size:14px;line-height:2.2">
+        <strong>训练样本</strong> $\{(\mathbf{x}_i, y_i)\}$<br>
+        &nbsp;&nbsp;↓ 计算<br>
+        <strong>内积/核矩阵</strong> $\mathbf{x}_i^T\mathbf{x}_j$ 或 $K(\mathbf{x}_i, \mathbf{x}_j)$<br>
+        &nbsp;&nbsp;↓ 代入<br>
+        <strong>对偶优化问题</strong> $\max \sum\alpha_i - \frac{1}{2}\sum\alpha_i\alpha_j y_i y_j K_{ij}$<br>
+        &nbsp;&nbsp;↓ 求解（SMO算法）<br>
+        <strong>对偶变量</strong> $\alpha_i^*$（多数为0，稀疏性）<br>
+        &nbsp;&nbsp;↓ 恢复<br>
+        <strong>决策函数</strong> $f(\mathbf{x}) = \sum_{SV} \alpha_i^* y_i K(\mathbf{x}_i, \mathbf{x}) + b^*$<br>
+        &nbsp;&nbsp;↓ 符号<br>
+        <strong>分类预测</strong> $\hat{y} = \text{sign}(f(\mathbf{x}))$
+      </div>
+    </div>
+  </div>
+
+  <h3>13.2 三种SVM对比</h3>
+  <table>
+    <colgroup><col style="width:18%"><col style="width:27%"><col style="width:27%"><col style="width:28%"></colgroup>
+    <thead><tr><th>类型</th><th>原问题</th><th>对偶约束</th><th>适用场景</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>硬间隔</td>
+        <td>$\min \frac{1}{2}\|\mathbf{w}\|^2$<br>s.t. $y_i f(\mathbf{x}_i) \ge 1$</td>
+        <td>$\alpha_i \ge 0$<br>$\sum\alpha_i y_i = 0$</td>
+        <td>严格线性可分数据</td>
+      </tr>
+      <tr>
+        <td>软间隔</td>
+        <td>$\min \frac{1}{2}\|\mathbf{w}\|^2 + C\sum\xi_i$<br>s.t. $y_i f(\mathbf{x}_i) \ge 1-\xi_i$</td>
+        <td>$0 \le \alpha_i \le C$<br>$\sum\alpha_i y_i = 0$</td>
+        <td>近似线性可分数据</td>
+      </tr>
+      <tr>
+        <td>核SVM</td>
+        <td>$\min \frac{1}{2}\|\mathbf{w}\|^2 + C\sum\xi_i$<br>s.t. $y_i\langle\mathbf{w},\phi(\mathbf{x}_i)\rangle+b \ge 1-\xi_i$</td>
+        <td>$0 \le \alpha_i \le C$<br>$\sum\alpha_i y_i = 0$</td>
+        <td>线性不可分数据</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>13.3 关键公式速查</h3>
+  <div class="derive-steps">
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num" style="background:var(--accent3)">公</span>
+        <span class="derive-step-title">原问题</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula formula-left">
+        $\displaystyle\min_{\mathbf{w},b,\boldsymbol{\xi}} \frac{1}{2}\|\mathbf{w}\|_2^2 + C\sum_{i=1}^n \xi_i$<br><br>
+        s.t. $y_i(\mathbf{w}^T\mathbf{x}_i + b) \ge 1 - \xi_i,\quad \xi_i \ge 0$
+        </div>
+      </div>
+    </div>
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num" style="background:var(--accent3)">公</span>
+        <span class="derive-step-title">对偶问题</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula formula-left">
+        $\displaystyle\max_{\boldsymbol{\alpha}} \sum_{i=1}^n \alpha_i - \frac{1}{2}\sum_{i,j}\alpha_i\alpha_j y_i y_j K(\mathbf{x}_i,\mathbf{x}_j)$<br><br>
+        s.t. $0 \le \alpha_i \le C,\quad \sum\alpha_i y_i = 0$
+        </div>
+      </div>
+    </div>
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num" style="background:var(--accent3)">公</span>
+        <span class="derive-step-title">参数恢复</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula formula-left">
+        $\mathbf{w}^* = \sum_{i \in SV} \alpha_i^* y_i \mathbf{x}_i$（线性核）<br><br>
+        $b^* = y_j - \sum_{i \in SV} \alpha_i^* y_i K(\mathbf{x}_i,\mathbf{x}_j),\ j \in S_f$
+        </div>
+      </div>
+    </div>
+    <div class="derive-step open">
+      <div class="derive-step-header">
+        <span class="derive-step-num" style="background:var(--accent3)">公</span>
+        <span class="derive-step-title">预测</span>
+        <span class="derive-step-arrow">▶</span>
+      </div>
+      <div class="derive-step-body">
+        <div class="formula formula-left">
+        $f(\mathbf{x}) = \sum_{i \in SV} \alpha_i^* y_i K(\mathbf{x}_i, \mathbf{x}) + b^*$<br><br>
+        $\hat{y} = \text{sign}(f(\mathbf{x}))$
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>13.4 思考题</h3>
+  <ol style="margin:0 0 14px 24px">
+    <li>为什么 $b$ 不能直接解释成距离？（提示：$b$ 的值依赖于 $\mathbf{w}$ 的缩放规范化）</li>
+    <li>分类正确的样本，损失一定为零吗？（提示：软间隔中进入间隔的正确分类样本 hinge 损失 > 0）</li>
+    <li>软间隔的支持向量一定在支撑线上吗？（提示：$\alpha_i = C$ 的支持向量可能在间隔内或误分类）</li>
+    <li>对偶目标中，数据通过什么量参与计算？（提示：样本内积 $\mathbf{x}_i^T\mathbf{x}_j$ 或核函数 $K(\mathbf{x}_i,\mathbf{x}_j)$）</li>
+  </ol>
+
+  <h3>13.5 延伸学习</h3>
+  <ul style="margin:0 0 14px 24px">
+    <li><strong>SMO算法</strong>：求解SVM对偶问题的高效算法，每次优化两个变量</li>
+    <li><strong>多分类SVM</strong>：One-vs-One (OVO) 和 One-vs-Rest (OVR) 策略</li>
+    <li><strong>SVR（支持向量回归）</strong>：将SVM思想推广到回归问题，引入 $\epsilon$-不敏感损失</li>
+    <li><strong>结构风险最小化 (SRM)</strong>：SVM的统计学习理论基础，VC维与间隔的关系</li>
+    <li><strong>核函数设计</strong>：针对特定数据类型（文本、图、序列）设计定制核</li>
+  </ul>
+
+  <div class="callout callout-key" style="margin-top:32px">
+    <div class="callout-title">学习完成</div>
+    你已经完成了支持向量机从第一性原理到代码实现的完整学习。建议回到交互式演示，通过调节参数直观理解每个概念的含义，然后动手完成课件中的实验任务。
+  </div>
+</section>
+
+<!-- PLACEHOLDER_CHAPTERS -->
+
+</main>
+</div>
+
+<div class="footer">
+  <div>基于王春雪老师《机器学习》课件 · 支持向量机</div>
+  <div>杭州电子科技大学 · 数学科学学院</div>
+</div>
+
+<script>
+// ===== 全局状态 =====
+const state = { allOpen: false };
+
+// ===== 主题切换 =====
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', () => {
+  const html = document.documentElement;
+  const isLight = html.getAttribute('data-theme') === 'light';
+  html.setAttribute('data-theme', isLight ? '' : 'light');
+  document.getElementById('themeText').textContent = isLight ? '深色' : '浅色';
+  document.getElementById('themeIcon').textContent = isLight ? '◐' : '◑';
+});
+
+// ===== 侧边栏导航 =====
+const navItems = document.querySelectorAll('.nav-item');
+const chapters = document.querySelectorAll('.chapter');
+const crumbCurrent = document.getElementById('crumbCurrent');
+const chapterTitles = {
+  intro:'课程概览', intuition:'核心直觉', 'hard-model':'优化模型建立',
+  'hard-dual':'对偶问题推导', 'hard-kkt':'KKT与参数恢复', 'hard-example':'手算示例',
+  'soft-intro':'松弛变量与hinge损失', 'soft-dual':'软间隔对偶',
+  'kernel-idea':'特征映射与核技巧', 'kernel-types':'核函数详解', 'kernel-predict':'核SVM预测',
+  'exp-code':'代码与调参', 'exp-cv':'交叉验证', summary:'知识图谱'
+};
+
+function showChapter(id) {
+  chapters.forEach(c => c.style.display = c.id === id ? 'block' : 'none');
+  navItems.forEach(n => n.classList.toggle('active', n.dataset.target === id));
+  crumbCurrent.textContent = chapterTitles[id] || '';
+  window.scrollTo({top:0, behavior:'smooth'});
+  closeSidebar();
+  if (window.renderMathInElement) {
+    try { renderMathInElement(document.getElementById(id), {
+      delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError:false
+    }); } catch(e){}
+  }
+}
+navItems.forEach(n => n.addEventListener('click', e => { e.preventDefault(); showChapter(n.dataset.target); }));
+
+// ===== 移动端菜单 =====
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('overlay');
+const menuToggle = document.getElementById('menuToggle');
+function openSidebar(){sidebar.classList.add('open');overlay.classList.add('show')}
+function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('show')}
+menuToggle.addEventListener('click', openSidebar);
+overlay.addEventListener('click', closeSidebar);
+
+// ===== 推导步骤展开 =====
+document.addEventListener('click', e => {
+  const header = e.target.closest('.derive-step-header');
+  if (header) header.parentElement.classList.toggle('open');
+});
+
+// ===== 展开全部 =====
+document.getElementById('expandAll').addEventListener('click', function() {
+  state.allOpen = !state.allOpen;
+  document.querySelectorAll('.derive-step').forEach(s => s.classList.toggle('open', state.allOpen));
+  this.textContent = state.allOpen ? '收起全部推导' : '展开全部推导';
+});
+
+// ===== 滚动进度 =====
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('progressBar').style.width = pct + '%';
+});
+
+// ===== 演示1：最大间隔 =====
+(function(){
+  const canvas = document.getElementById('marginCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  // 数据点
+  const neg = [{x:1,y:1},{x:2,y:1.5},{x:1.5,y:2.5}];
+  const pos = [{x:4,y:3.5},{x:5,y:3},{x:4.5,y:4.5}];
+  const all = [...neg.map(p=>({...p,y:-1})), ...pos.map(p=>({...p,y:1}))];
+
+  function toCanvas(x,y){ return [60 + x*90, H - 50 - y*70]; }
+
+  function draw(w1, b) {
+    ctx.clearRect(0,0,W,H);
+    // 网格
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<=6;i++){const [x]=toCanvas(i,0);ctx.beginPath();ctx.moveTo(x,30);ctx.lineTo(x,H-50);ctx.stroke();}
+    for(let i=0;i<=5;i++){const [,y]=toCanvas(0,i);ctx.beginPath();ctx.moveTo(50,y);ctx.lineTo(W-30,y);ctx.stroke();}
+    // 轴
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(50,H-50);ctx.lineTo(W-30,H-50);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(60,30);ctx.lineTo(60,H-50);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='11px sans-serif';
+    ctx.fillText('x₁',W-35,H-55);ctx.fillText('x₂',55,25);
+
+    // 边界 w1*x1 + w2*x2 + b = 0, 固定w2=1 => x2 = -w1*x1 - b
+    const w2 = 1;
+    const norm = Math.sqrt(w1*w1 + w2*w2);
+    // 画线
+    function drawLine(val, color, dashed) {
+      const x1v = 0, y1v = (-w1*x1v - b + val) / w2;
+      const x2v = 6, y2v = (-w1*x2v - b + val) / w2;
+      const [cx1,cy1]=toCanvas(x1v,y1v),[cx2,cy2]=toCanvas(x2v,y2v);
+      ctx.strokeStyle=color;ctx.lineWidth=2;
+      if(dashed){ctx.setLineDash([6,4])}else{ctx.setLineDash([])}
+      ctx.beginPath();ctx.moveTo(cx1,cy1);ctx.lineTo(cx2,cy2);ctx.stroke();ctx.setLineDash([]);
+    }
+    drawLine(0, '#5b9dff', false);
+    drawLine(1, 'rgba(88,211,159,0.6)', true);
+    drawLine(-1, 'rgba(255,107,107,0.6)', true);
+
+    // 点
+    function drawPoint(p, color) {
+      const [cx,cy]=toCanvas(p.x,p.y);
+      ctx.fillStyle=color;ctx.beginPath();ctx.arc(cx,cy,7,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1.5;ctx.stroke();
+    }
+    neg.forEach(p=>drawPoint(p,'#ff6b6b'));
+    pos.forEach(p=>drawPoint(p,'#38d39f'));
+
+    // 计算最近距离
+    let minDist = Infinity, correct = true;
+    all.forEach(p=>{
+      const d = Math.abs(w1*p.x + w2*p.y + b)/norm;
+      if (d < minDist) minDist = d;
+      if (p.y * (w1*p.x + w2*p.y + b) <= 0) correct = false;
+    });
+    document.getElementById('m_rho').textContent = minDist.toFixed(3);
+    document.getElementById('m_margin').textContent = (2*minDist).toFixed(3);
+    document.getElementById('m_status').textContent = correct ? '全部正确分类' : '存在误分类';
+    document.getElementById('m_status').style.color = correct ? 'var(--accent3)' : 'var(--danger)';
+  }
+
+  const s1=document.getElementById('m_slope'), s2=document.getElementById('m_bias');
+  function update(){
+    const w1=parseFloat(s1.value), b=parseFloat(s2.value);
+    document.getElementById('m_slope_val').textContent=w1.toFixed(1);
+    document.getElementById('m_bias_val').textContent=b.toFixed(1);
+    draw(w1,b);
+  }
+  s1.addEventListener('input',update);
+  s2.addEventListener('input',update);
+  document.getElementById('m_optimal').addEventListener('click',()=>{
+    s1.value=-1; s2.value=4.5; update();
+  });
+  update();
+})();
+
+// ===== 演示：手算示例边界 =====
+(function(){
+  const canvas = document.getElementById('exampleCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  function tc(x,y){return [80+x*80, H-60-y*80];}
+  ctx.clearRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const [x]=tc(i,0);ctx.beginPath();ctx.moveTo(x,30);ctx.lineTo(x,H-60);ctx.stroke();}
+  for(let i=0;i<=4;i++){const [,y]=tc(0,i);ctx.beginPath();ctx.moveTo(70,y);ctx.lineTo(W-40,y);ctx.stroke();}
+  // axes
+  ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(70,H-60);ctx.lineTo(W-40,H-60);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(80,30);ctx.lineTo(80,H-60);ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';
+  ctx.fillText('x₁',W-45,H-65);ctx.fillText('x₂',75,25);
+  // support lines H-: x1+x2=0, H: x1+x2=2, H+: x1+x2=4
+  function line(val,color,dash){
+    const x1=0,y1=val-x1,x2=4,y2=val-x2;
+    const [cx1,cy1]=tc(x1,y1),[cx2,cy2]=tc(x2,y2);
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    if(dash)ctx.setLineDash([6,4]);else ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(cx1,cy1);ctx.lineTo(cx2,cy2);ctx.stroke();ctx.setLineDash([]);
+  }
+  line(0,'rgba(255,107,107,0.5)',true);
+  line(2,'#5b9dff',false);
+  line(4,'rgba(56,211,159,0.5)',true);
+  // labels
+  ctx.fillStyle='rgba(255,107,107,0.7)';ctx.font='11px sans-serif';
+  const [lx0,ly0]=tc(0,0);ctx.fillText('H₋: x₁+x₂=0',lx0+8,ly0-8);
+  ctx.fillStyle='#5b9dff';const [lx2,ly2]=tc(1,1);ctx.fillText('H: x₁+x₂=2',lx2+8,ly2-8);
+  ctx.fillStyle='rgba(56,211,159,0.7)';const [lx4,ly4]=tc(2,2);ctx.fillText('H₊: x₁+x₂=4',lx4+8,ly4-8);
+  // points
+  function pt(x,y,color,label){
+    const [cx,cy]=tc(x,y);
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(label,cx,cy+4);ctx.textAlign='left';
+  }
+  pt(0,0,'#ff6b6b','-1');
+  pt(2,2,'#38d39f','+1');
+  // margin annotation
+  ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  const [mx1,my1]=tc(0,0),[mx2,my2]=tc(1,1);
+  ctx.beginPath();ctx.moveTo(mx1,my1);ctx.lineTo(mx2,my2);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='11px sans-serif';
+  ctx.fillText('M=2/‖w‖=√2',(mx1+mx2)/2+8,(my1+my2)/2-8);
+})();
+
+// ===== 演示：松弛变量四种位置 =====
+window.drawXi = function(type){
+  const canvas=document.getElementById('xiCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // boundary at x=300 (vertical), H+ at x=380, H- at x=220
+  const bx=300, hp=380, hm=220;
+  // shaded margin area
+  ctx.fillStyle='rgba(91,157,255,0.06)';
+  ctx.fillRect(hm,30,hp-hm,H-60);
+  // lines
+  ctx.strokeStyle='rgba(255,107,107,0.4)';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+  ctx.beginPath();ctx.moveTo(hm,30);ctx.lineTo(hm,H-30);ctx.stroke();
+  ctx.strokeStyle='rgba(56,211,159,0.4)';
+  ctx.beginPath();ctx.moveTo(hp,30);ctx.lineTo(hp,H-30);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle='#5b9dff';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(bx,30);ctx.lineTo(bx,H-30);ctx.stroke();
+  // labels
+  ctx.fillStyle='rgba(255,107,107,0.6)';ctx.font='12px sans-serif';ctx.fillText('H₋ (f=-1)',hm-70,H-45);
+  ctx.fillStyle='#5b9dff';ctx.fillText('H (f=0)',bx-50,H-45);
+  ctx.fillStyle='rgba(56,211,159,0.6)';ctx.fillText('H₊ (f=+1)',hp-10,H-45);
+  ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='11px sans-serif';
+  ctx.fillText('← 负类区域',30,H-15);ctx.fillText('正类区域 →',W-100,H-15);
+  // sample point positions (positive class y=+1)
+  const positions={A:{x:440,y:120,xi:0,label:'A: ξ=0',color:'#38d39f'},
+    B:{x:340,y:170,xi:0.5,label:'B: ξ=0.5',color:'#ffb454'},
+    C:{x:300,y:220,xi:1,label:'C: ξ=1',color:'#ff6b6b'},
+    D:{x:180,y:270,xi:2,label:'D: ξ=2',color:'#ff3b3b'}};
+  // draw all faint
+  Object.values(positions).forEach(p=>{
+    ctx.globalAlpha=0.25;ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  });
+  // highlight selected
+  const p=positions[type];
+  ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,10,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  // xi annotation: distance from H+
+  if(p.xi>0){
+    ctx.strokeStyle=p.color;ctx.lineWidth=2;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(p.x,p.y-18);ctx.lineTo(hp,p.y-18);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=p.color;ctx.font='bold 12px sans-serif';
+    ctx.fillText(`ξ=${p.xi}`,(p.x+hp)/2-15,p.y-24);
+  }
+  // info
+  ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';
+  ctx.fillText(p.label,40,50);
+  const desc={A:'分类正确，在间隔之外，损失为0',B:'分类正确但进入间隔，hinge损失=0.5',
+    C:'恰在分类边界上，hinge损失=1',D:'被误分类，hinge损失=2'};
+  ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='13px sans-serif';
+  ctx.fillText(desc[type],40,75);
+};
+if(document.getElementById('xiCanvas')) drawXi('A');
+
+// ===== 演示：hinge损失 =====
+(function(){
+  const canvas=document.getElementById('hingeCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const ox=60,oy=H-50,aw=W-100,ah=H-90;
+  ctx.clearRect(0,0,W,H);
+  // axes
+  ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(ox,20);ctx.lineTo(ox,oy);ctx.lineTo(W-30,oy);ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';
+  ctx.fillText('损失',ox-45,30);ctx.fillText('y·f(x)',W-50,oy+20);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.05)';
+  for(let i=0;i<=4;i++){const y=oy-ah*i/4;ctx.beginPath();ctx.moveTo(ox,y);ctx.lineTo(W-30,y);ctx.stroke();}
+  // hinge loss: max(0, 1-t)
+  ctx.strokeStyle='#38d39f';ctx.lineWidth=2.5;ctx.beginPath();
+  for(let px=0;px<=aw;px++){
+    const t=-1+3*px/aw; // t from -1 to 2
+    const loss=Math.max(0,1-t);
+    const py=oy-loss*ah/2.5;
+    if(px===0)ctx.moveTo(ox+px,py);else ctx.lineTo(ox+px,py);
+  }
+  ctx.stroke();
+  // marker at t=1
+  const tx=ox+aw*(1-(-1))/3;
+  ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(tx,oy);ctx.lineTo(tx,oy-ah);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='11px sans-serif';
+  ctx.fillText('t=1',tx-8,oy+16);
+  // 0-1 loss for comparison
+  ctx.strokeStyle='rgba(255,107,107,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([6,3]);
+  ctx.beginPath();
+  ctx.moveTo(ox,oy-ah*0.4);ctx.lineTo(ox+aw*2/3,oy-ah*0.4);
+  ctx.lineTo(ox+aw*2/3+1,oy);ctx.lineTo(W-30,oy);
+  ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,107,107,0.6)';ctx.font='11px sans-serif';
+  ctx.fillText('0-1损失',W-90,oy-ah*0.4-8);
+  ctx.fillStyle='#38d39f';ctx.fillText('hinge损失',W-90,oy-ah*0.7);
+})();
+
+// ===== 演示：一维升维 =====
+(function(){
+  const canvas=document.getElementById('liftCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const sld=document.getElementById('lift_thresh');
+  const valEl=document.getElementById('lift_thresh_val');
+  // data: neg in middle, pos on sides
+  const neg=[-1.2,-0.5,0.3,0.9],pos=[-2.5,-2,1.8,2.4];
+  function draw(){
+    const th=parseFloat(sld.value);
+    valEl.textContent=th.toFixed(1);
+    ctx.clearRect(0,0,W,H);
+    const split=W/2;
+    // LEFT: 1D
+    ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(20,20,split-40,H-40);
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='12px sans-serif';ctx.fillText('原空间 (1D)',40,42);
+    const ly=H/2,lx=50,lw=split-100;
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+lw,ly);ctx.stroke();
+    // arrows
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.beginPath();ctx.moveTo(lx+lw,ly);ctx.lineTo(lx+lw-6,ly-4);ctx.lineTo(lx+lw-6,ly+4);ctx.fill();
+    ctx.fillText('x',lx+lw+4,ly+4);
+    function p1d(x,color){
+      const px=lx+(x+3)/6*lw;
+      ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,ly,6,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    }
+    neg.forEach(x=>p1d(x,'#ff6b6b'));
+    pos.forEach(x=>p1d(x,'#38d39f'));
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='11px sans-serif';
+    ctx.fillText('单个阈值无法分开',40,H-30);
+    // RIGHT: 2D
+    ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(split+20,20,split-40,H-40);
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='12px sans-serif';ctx.fillText('特征空间 (2D): φ(x)=(x, x²)',split+40,42);
+    const ox2=split+60,oy2=H-50,aw2=split-120,ah2=H-100;
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(ox2,30);ctx.lineTo(ox2,oy2);ctx.lineTo(W-40,oy2);ctx.stroke();
+    // parabola x²
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let px=0;px<=aw2;px++){
+      const x=-3+6*px/aw2;const y=x*x;
+      const py=oy2-y/9*ah2;
+      if(px===0)ctx.moveTo(ox2+px,py);else ctx.lineTo(ox2+px,py);
+    }
+    ctx.stroke();
+    // threshold line z2=th
+    const ty=oy2-th/9*ah2;
+    ctx.strokeStyle='#5b9dff';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(ox2,ty);ctx.lineTo(W-40,ty);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#5b9dff';ctx.font='11px sans-serif';ctx.fillText(`z₂=${th.toFixed(1)}`,W-100,ty-6);
+    function p2d(x,color){
+      const px=ox2+(x+3)/6*aw2;const py=oy2-x*x/9*ah2;
+      ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,6,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    }
+    neg.forEach(x=>p2d(x,'#ff6b6b'));
+    pos.forEach(x=>p2d(x,'#38d39f'));
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='11px sans-serif';
+    ctx.fillText('水平线 z₂=阈值 可分开',split+40,H-30);
+  }
+  sld.addEventListener('input',draw);
+  draw();
+})();
+
+// ===== 演示：高斯核截面 =====
+(function(){
+  const canvas=document.getElementById('rbfCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const sld=document.getElementById('rbf_gamma');
+  const valEl=document.getElementById('rbf_gamma_val');
+  const ox=60,oy=H-50,aw=W-100,ah=H-90;
+  function draw(){
+    const gamma=parseFloat(sld.value);
+    valEl.textContent=gamma.toFixed(2);
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(ox,20);ctx.lineTo(ox,oy);ctx.lineTo(W-30,oy);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';
+    ctx.fillText('K(x,0)',ox-50,30);ctx.fillText('x',W-45,oy+20);
+    ctx.strokeStyle='rgba(255,255,255,0.05)';
+    for(let i=0;i<=4;i++){const y=oy-ah*i/4;ctx.beginPath();ctx.moveTo(ox,y);ctx.lineTo(W-30,y);ctx.stroke();}
+    // curve
+    ctx.strokeStyle='#7c5bff';ctx.lineWidth=2.5;ctx.beginPath();
+    for(let px=0;px<=aw;px++){
+      const x=-3+6*px/aw;
+      const k=Math.exp(-gamma*x*x);
+      const py=oy-k*ah;
+      if(px===0)ctx.moveTo(ox+px,py);else ctx.lineTo(ox+px,py);
+    }
+    ctx.stroke();
+    // fill
+    ctx.lineTo(ox+aw,oy);ctx.lineTo(ox,oy);ctx.closePath();
+    ctx.fillStyle='rgba(124,91,255,0.1)';ctx.fill();
+    // sigma annotation
+    const sigma=1/Math.sqrt(2*gamma);
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='12px sans-serif';
+    ctx.fillText(`σ=${sigma.toFixed(2)}`,W-120,40);
+  }
+  sld.addEventListener('input',draw);
+  draw();
+})();
+
+// ===== 演示：RBF核SVM决策边界（简化梯度下降训练） =====
+(function(){
+  const canvas=document.getElementById('svmCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const cSld=document.getElementById('svm_C');
+  const gSld=document.getElementById('svm_gamma');
+  const cVal=document.getElementById('svm_C_val');
+  const gVal=document.getElementById('svm_gamma_val');
+  const nsvEl=document.getElementById('svm_nsv');
+  const accEl=document.getElementById('svm_acc');
+
+  // seeded random
+  let seed=42;
+  function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646;}
+  function gauss(){return Math.sqrt(-2*Math.log(rnd()))*Math.cos(2*Math.PI*rnd());}
+
+  // generate moons
+  function makeMoons(n,noise){
+    seed=42;const pts=[];
+    for(let i=0;i<n;i++){
+      const cls=i<n/2?0:1;
+      const t=cls===0?Math.PI*i/(n/2):Math.PI*(i-n/2)/(n/2);
+      const cx=cls===0?0:1,cy=cls===0?0:-0.5;
+      const x=cx+Math.cos(t)+gauss()*noise;
+      const y=cy+Math.sin(t)+gauss()*noise;
+      pts.push({x,y:y+(cls===0?0:0.5),label:cls===0?-1:1});
+    }
+    return pts;
+  }
+  const data=makeMoons(80,0.22);
+  // normalize
+  const xs=data.map(p=>p.x),ys=data.map(p=>p.y);
+  const mx=Math.min(...xs),sx=Math.max(...xs)-mx;
+  const my=Math.min(...ys),sy=Math.max(...ys)-my;
+  data.forEach(p=>{p.x=(p.x-mx)/sx;p.y=(p.y-my)/sy;});
+
+  function tc(x,y){return [40+x*(W-80),H-40-y*(H-80)];}
+
+  // kernel
+  function K(p,q,gamma){const dx=p.x-q.x,dy=p.y-q.y;return Math.exp(-gamma*(dx*dx+dy*dy));}
+
+  // train via simplified gradient ascent on dual
+  function train(C,gamma){
+    const n=data.length;
+    const alpha=new Array(n).fill(0);
+    const b={v:0};
+    // precompute kernel matrix
+    const Kmat=[];
+    for(let i=0;i<n;i++){Kmat[i]=[];for(let j=0;j<n;j++)Kmat[i][j]=K(data[i],data[j],gamma);}
+    // gradient ascent with projection
+    const lr=0.01;
+    for(let iter=0;iter<300;iter++){
+      // compute f(x_i) = sum alpha_j y_j K_ij + b
+      const f=new Array(n);
+      for(let i=0;i<n;i++){
+        let s=b.v;
+        for(let j=0;j<n;j++)s+=alpha[j]*data[j].label*Kmat[i][j];
+        f[i]=s;
+      }
+      // gradient: dW/dalpha_i = 1 - y_i * f(x_i)
+      for(let i=0;i<n;i++){
+        const grad=1-data[i].label*f[i];
+        alpha[i]+=lr*grad;
+        // project to [0,C]
+        alpha[i]=Math.max(0,Math.min(C,alpha[i]));
+      }
+      // enforce sum alpha*y = 0 by adjusting
+      let syy=0;for(let i=0;i<n;i++)syy+=alpha[i]*data[i].label;
+      if(Math.abs(syy)>1e-6){
+        const pos=data.filter((_,i)=>data[i].label>0).map((_,i)=>data.indexOf(data.filter(d=>d.label>0)[i]));
+        // simple: shift all by average
+        // better: adjust proportionally - skip for demo, b absorbs some
+      }
+      // update b from free SVs
+      const free=[];
+      for(let i=0;i<n;i++)if(alpha[i]>1e-4&&alpha[i]<C-1e-4)free.push(i);
+      if(free.length>0){
+        let sb=0;
+        free.forEach(i=>{
+          let s=0;for(let j=0;j<n;j++)s+=alpha[j]*data[j].label*Kmat[i][j];
+          sb+=data[i].label-s;
+        });
+        b.v=sb/free.length;
+      }
+    }
+    return {alpha,b:b.v};
+  }
+
+  function predict(p,model,gamma){
+    let s=model.b;
+    for(let i=0;i<data.length;i++){
+      if(model.alpha[i]>1e-4)s+=model.alpha[i]*data[i].label*K(data[i],p,gamma);
+    }
+    return s;
+  }
+
+  let currentModel=null;
+  function draw(){
+    const C=parseFloat(cSld.value);
+    const gamma=parseFloat(gSld.value);
+    cVal.textContent=C.toFixed(1);gVal.textContent=gamma.toFixed(1);
+    const model=train(C,gamma);
+    currentModel=model;
+    ctx.clearRect(0,0,W,H);
+    // decision boundary via grid
+    const step=8;
+    for(let py=0;py<H;py+=step){
+      for(let px=0;px<W;px+=step){
+        const x=(px-40)/(W-80),y=(H-40-py)/(H-80);
+        const f=predict({x,y},model,gamma);
+        if(f>0)ctx.fillStyle='rgba(56,211,159,0.12)';
+        else ctx.fillStyle='rgba(255,107,107,0.12)';
+        ctx.fillRect(px,py,step,step);
+      }
+    }
+    // contour lines
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1;
+    for(let py=0;py<H;py+=4){
+      for(let px=0;px<W;px+=4){
+        const x=(px-40)/(W-80),y=(H-40-py)/(H-80);
+        const f=predict({x,y},model,gamma);
+        if(Math.abs(f)<0.05){ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fillRect(px,py,3,3);}
+      }
+    }
+    // data points
+    let correct=0,nsv=0;
+    data.forEach((p,i)=>{
+      const [cx,cy]=tc(p.x,p.y);
+      const isSV=model.alpha[i]>1e-4;
+      if(isSV)nsv++;
+      const f=predict(p,model,gamma);
+      const pred=f>=0?1:-1;
+      if(pred===p.label)correct++;
+      ctx.fillStyle=p.label>0?'#38d39f':'#ff6b6b';
+      ctx.beginPath();ctx.arc(cx,cy,isSV?8:6,0,Math.PI*2);ctx.fill();
+      if(isSV){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
+      else{ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;ctx.stroke();}
+    });
+    nsvEl.textContent=nsv;
+    accEl.textContent=(correct/data.length*100).toFixed(1)+'%';
+  }
+  cSld.addEventListener('input',draw);
+  gSld.addEventListener('input',draw);
+  document.getElementById('svm_retrain').addEventListener('click',draw);
+  draw();
+})();
+
+// ===== KaTeX 自动渲染（初始） =====
+function tryRenderKatex(){
+  if (window.renderMathInElement) {
+    try {
+      renderMathInElement(document.body, {
+        delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+        throwOnError:false
+      });
+    } catch(e){}
+  }
+}
+document.addEventListener('DOMContentLoaded', tryRenderKatex);
+// 如果脚本已加载
+if (document.readyState !== 'loading') tryRenderKatex();
+else document.addEventListener('DOMContentLoaded', tryRenderKatex);
+// 延迟重试（处理defer加载顺序）
+setTimeout(tryRenderKatex, 500);
+setTimeout(tryRenderKatex, 1500);
+</script>
+</body>
+</html>
